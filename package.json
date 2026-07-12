@@ -1,0 +1,30 @@
+{
+  "name": "dot-skill",
+  "version": "0.4.1",
+  "private": true,
+  "description": "Open .skill Protocol — portable, verifiable AI skill packages (continuity + release).",
+  "license": "MIT",
+  "author": {
+    "name": "Bharat Dudeja",
+    "url": "https://github.com/bharatdudeja13-cmd"
+  },
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @dot-skill/protocol && npm run build -w @dot-skill/core && npm run build -w @dot-skill/runtime && npm run build -w @dot-skill/registry && npm run build -w @dot-skill/workspace && npm run build -w @dot-skill/cli",
+    "test": "npm run build && npm run test -w @dot-skill/cli",
+    "test:examples": "SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/knowledge-only/recipe.json --approve --profile continuity -o /tmp/dot-skill-knowledge.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/parameterized-integration/recipe.json --approve --profile release -o /tmp/dot-skill-integration.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/code-changing/recipe.json --approve --profile release -o /tmp/dot-skill-code.skill",
+    "pack:check": "npm pack --workspaces --dry-run",
+    "skill": "node packages/cli/dist/cli.js",
+    "dot-skill": "node packages/cli/dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dot-skill/dot-skill.git"
+  }
+}

@@ -1,0 +1,730 @@
+import { createHash, randomUUID } from "node:crypto";
+import type {
+  CompletenessPart,
+  CompletenessReport,
+  CompilationIssue,
+  CompilationMapping,
+  CompilationReport,
+  GenerationUsage,
+  InputSlot,
+  KnowledgeItem,
+  KnowledgeItemType,
+  Recipe,
+  SkillCompileProfile,
+  SkillPackageFiles,
+  SkillSection,
+  SkillSource,
+  SteeringConstraint,
+  WorkflowStep,
+} from "@dot-skill/protocol";
+import {
+  DEFAULT_SKILL_POLICY,
+  CONTAINER_VERSION,
+  PROTOCOL_VERSION,
+  WORKFLOW_DIALECT_VERSION,
+  isValidAgentHost,
+  recipeToSkillSource,
+} from "@dot-skill/protocol";
+import { packSkill, finalizeManifest, buildFileMap } from "./pack.js";
+
+const PLACEHOLDER_RE =
+  /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}|<([A-Z][A-Z0-9_]+)>|\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
+
+const SECRET_PATTERNS: RegExp[] = [
+  /\b(?:sk|pk|api)[_-][A-Za-z0-9]{8,}\b/g,
+  /\bBearer\s+[A-Za-z0-9\-._~+/]+=*/gi,
+  /\b[A-Za-z0-9+/]{40,}={0,2}\b/g,
+];
+
+const GENERALIZABLE_PATTERNS: Array<{
+  re: RegExp;
+  name: string;
+  reason: string;
+}> = [
+  {
+    re: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+    name: "email",
+    reason: "Email addresses vary per deployment",
+  },
+  {
+    re: /\bhttps?:\/\/[^\s)]+/gi,
+    name: "base_url",
+    reason: "Service URLs are environment-specific",
+  },
+  {
+    re: /\b(?:sk|pk|api)[_-][A-Za-z0-9]{8,}\b/g,
+    name: "api_credential_ref",
+    reason: "Credentials must be secret refs, never embedded",
+  },
+];
+
+function shortId(prefix: string): string {
+  return `${prefix}_${createHash("sha256").update(randomUUID()).digest("hex").slice(0, 12)}`;
+}
+
+function knowledgeTypeFor(section: SkillSection): KnowledgeItemType {
+  switch (section.type) {
+    case "decision":
+      return "decision";
+    case "tradeoff":
+      return "tradeoff";
+    case "lesson":
+      return "lesson";
+    case "correction_note":
+      return "correction";
+    case "requirement":
+    case "intent":
+      return "constraint";
+    case "reference":
+    case "resource":
+    case "doc":
+      return "reference";
+    default:
+      return "rule";
+  }
+}
+
+function slug(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 40) || "value"
+  );
+}
+
+/** Scrub likely secrets from text before packaging. */
+export function redactSecrets(text: string): string {
+  let out = text;
+  for (const re of SECRET_PATTERNS) {
+    re.lastIndex = 0;
+    out = out.replace(re, "{{secret_ref}}");
+  }
+  return out;
+}
+
+export class CompileRefusalError extends Error {
+  readonly kind = "compile_refused" as const;
+  readonly profile: SkillCompileProfile;
+  readonly missing: CompletenessPart[];
+  readonly hints: string[];
+  readonly completeness: CompletenessReport;
+
+  constructor(report: CompletenessReport) {
+    super(
+      `compile_refused (${report.profile}): missing [${report.missing.join(", ")}]. ${report.hints.join(" ")}`,
+    );
+    this.name = "CompileRefusalError";
+    this.profile = report.profile;
+    this.missing = report.missing;
+    this.hints = report.hints;
+    this.completeness = report;
+  }
+}
+
+export interface CompileOptions {
+  skill_id?: string;
+  version?: string;
+  title?: string;
+  description?: string;
+  provenance_mode?: "full" | "redacted" | "proof_only";
+  profile?: SkillCompileProfile;
+  /** When true, inferred inputs are marked approved (human already reviewed). */
+  approve_inferred_inputs?: boolean;
+  approve_permissions?: boolean;
+  generation_usage?: GenerationUsage;
+  /**
+   * Continuity may emit partial packages.
+   * Release refuses unless complete — set true only in tests that assert refusal.
+   */
+  allow_incomplete?: boolean;
+}
+
+export interface CompileResult {
+  files: SkillPackageFiles;
+  report: CompilationReport;
+  packageBytes: Uint8Array;
+  pending_approvals: string[];
+  completeness: CompletenessReport;
+}
+
+const HINTS: Record<CompletenessPart, string> = {
+  agent_context:
+    "Set SKILL_HOST to an AI host (cursor, ollama, lmstudio, llama-cpp, custom-agent, …). This is asserted provenance, not cryptographic proof.",
+  intent: "Add an intent/summary section describing what this skill is for.",
+  sections: "Agent must propose at least one section (decision, integration, workflow, …).",
+  workflow: "Need actionable workflow content (integration, prompt, implementation, or workflow_note).",
+  knowledge_or_prompts: "Need knowledge sections or prompt templates — not an empty package.",
+  inputs_declared:
+    "Declare typed inputs or set SkillSource.inputs_declared='none'. Placeholders like {{base_url}} become inputs.",
+  journey:
+    "Provide a redacted journey summary of the human+AI work (no raw chat, no secrets).",
+  generation_usage: "Optional but recommended: report token usage used to create this skill.",
+  human_approvals: "Human must approve inferred inputs/permissions before release mint.",
+};
+
+export function assessCompleteness(
+  source: SkillSource,
+  opts: {
+    profile: SkillCompileProfile;
+    hasWorkflowAction: boolean;
+    hasKnowledge: boolean;
+    hasInputsDeclared: boolean;
+    pendingApprovals: string[];
+  },
+): CompletenessReport {
+  const present: CompletenessPart[] = [];
+  const missing: CompletenessPart[] = [];
+
+  const check = (part: CompletenessPart, ok: boolean) => {
+    if (ok) present.push(part);
+    else missing.push(part);
+  };
+
+  check("agent_context", isValidAgentHost(source.agent.host));
+  check(
+    "intent",
+    Boolean((source.intent ?? source.summary ?? source.title)?.trim().length),
+  );
+  check("sections", source.sections.length >= 1);
+  check("knowledge_or_prompts", opts.hasKnowledge || source.prompts.length > 0);
+  check("workflow", opts.hasWorkflowAction);
+  check("inputs_declared", opts.hasInputsDeclared);
+  check(
+    "journey",
+    Boolean(source.journey?.summary?.trim()) && source.journey.redacted !== false,
+  );
+
+  if (source.generation_usage?.total_tokens || source.generation_usage?.input_tokens) {
+    present.push("generation_usage");
+  }
+
+  if (opts.profile === "release") {
+    check("human_approvals", opts.pendingApprovals.length === 0);
+    // generation_usage recommended but not hard-required for release
+  } else {
+    // continuity: drop soft requirements from missing
+    const soft = new Set<CompletenessPart>([
+      "workflow",
+      "inputs_declared",
+      "human_approvals",
+      "generation_usage",
+    ]);
+    for (let i = missing.length - 1; i >= 0; i--) {
+      if (soft.has(missing[i]!)) missing.splice(i, 1);
+    }
+  }
+
+  const requiredMissing =
+    opts.profile === "continuity"
+      ? missing.filter((m) =>
+          ["agent_context", "sections", "intent", "journey", "knowledge_or_prompts"].includes(m),
+        )
+      : missing.filter((m) => m !== "generation_usage");
+
+  return {
+    kind: "completeness_report",
+    profile: opts.profile,
+    complete: requiredMissing.length === 0,
+    present,
+    missing: requiredMissing,
+    hints: requiredMissing.map((m) => HINTS[m]),
+  };
+}
+
+function sectionHasWorkflowAction(sections: SkillSection[]): boolean {
+  return sections.some((s) =>
+    ["integration", "prompt", "implementation_note", "workflow_note", "code", "config"].includes(
+      s.type,
+    ),
+  );
+}
+
+export function compileSkillSource(
+  source: SkillSource,
+  opts: CompileOptions = {},
+): CompileResult {
+  const profile: SkillCompileProfile = opts.profile ?? "release";
+  const skillId = opts.skill_id ?? shortId("skl");
+  const version = opts.version ?? "1.0.0";
+  const issues: CompilationIssue[] = [];
+  const mappings: CompilationMapping[] = [];
+  const knowledge: KnowledgeItem[] = [];
+  const steps: WorkflowStep[] = [];
+  const inferredInputs: InputSlot[] = [];
+  const inputNames = new Set<string>();
+  const constraints: SteeringConstraint[] = [];
+
+  if (!isValidAgentHost(source.agent.host)) {
+    const completeness = assessCompleteness(source, {
+      profile,
+      hasWorkflowAction: false,
+      hasKnowledge: false,
+      hasInputsDeclared: true,
+      pendingApprovals: ["agent_context"],
+    });
+    completeness.missing = ["agent_context"];
+    completeness.complete = false;
+    completeness.hints = [HINTS.agent_context];
+    throw new CompileRefusalError(completeness);
+  }
+
+  const addInput = (slot: InputSlot) => {
+    if (inputNames.has(slot.name)) {
+      const existing = inferredInputs.find((i) => i.name === slot.name);
+      if (existing && slot.sensitivity === "secret") {
+        existing.sensitivity = "secret";
+        existing.source = "secret";
+      }
+      return;
+    }
+    inputNames.add(slot.name);
+    inferredInputs.push(slot);
+  };
+
+  for (const section of source.sections) {
+    let body = redactSecrets(section.body);
+    PLACEHOLDER_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = PLACEHOLDER_RE.exec(section.body))) {
+      const rawName = m[1] || m[2] || m[3] || "value";
+      const name = slug(rawName);
+      const isSecret = /secret|credential|token|password|key/i.test(name);
+      addInput({
+        name,
+        schema: { type: "string" },
+        description: `Value for ${name} generalized from section ${section.title}`,
+        source: isSecret ? "secret" : "human",
+        required: true,
+        sensitivity: isSecret ? "secret" : "private",
+        ask_when: "if_missing",
+        provenance: [{ kind: "section", id: section.id, revision: section.revision }],
+        generalization_reason: "Explicit placeholder in approved text",
+        approved: opts.approve_inferred_inputs === true,
+      });
+    }
+
+    for (const pat of GENERALIZABLE_PATTERNS) {
+      pat.re.lastIndex = 0;
+      if (pat.re.test(section.body)) {
+        const name = pat.name;
+        addInput({
+          name,
+          schema: { type: "string" },
+          description: pat.reason,
+          source: name.includes("credential") ? "secret" : "human",
+          required: true,
+          sensitivity: name.includes("credential") ? "secret" : "private",
+          ask_when: "if_missing",
+          provenance: [{ kind: "section", id: section.id, revision: section.revision }],
+          generalization_reason: pat.reason,
+          approved: opts.approve_inferred_inputs === true,
+        });
+        if (name.includes("credential")) {
+          body = body.replace(pat.re, "{{api_credential_ref}}");
+        }
+      }
+    }
+
+    const kid = `k_${section.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16)}`;
+    const item: KnowledgeItem = {
+      kind: "knowledge",
+      id: kid,
+      type: knowledgeTypeFor(section),
+      title: section.title,
+      body,
+      fidelity: "exact",
+      pinned: true,
+      sensitivity: section.sensitivity === "public" ? "public" : "private",
+      provenance: [
+        { kind: "section", id: section.id, revision: section.revision, hash: source.hash },
+      ],
+    };
+    knowledge.push(item);
+    mappings.push({
+      from: { kind: "section", id: section.id, revision: section.revision },
+      to: { kind: "knowledge", id: kid },
+    });
+
+    if (section.type === "prompt") {
+      const stepId = `s_prompt_${kid}`;
+      steps.push({
+        id: stepId,
+        kind: "prompt",
+        title: section.title,
+        template: body,
+        knowledge_refs: [kid],
+        provenance: [{ kind: "section", id: section.id, revision: section.revision }],
+      });
+      mappings.push({
+        from: { kind: "section", id: section.id, revision: section.revision },
+        to: { kind: "step", id: stepId },
+      });
+    } else if (
+      section.type === "integration" ||
+      section.type === "implementation_note" ||
+      section.type === "workflow_note"
+    ) {
+      const stepId = `s_instruct_${kid}`;
+      steps.push({
+        id: stepId,
+        kind: "instruct",
+        title: section.title,
+        text: body,
+        knowledge_refs: [kid],
+        provenance: [{ kind: "section", id: section.id, revision: section.revision }],
+      });
+      mappings.push({
+        from: { kind: "section", id: section.id, revision: section.revision },
+        to: { kind: "step", id: stepId },
+      });
+    } else if (section.type === "question") {
+      issues.push({
+        severity: "warning",
+        code: "unresolved_question",
+        message: `Section ${section.title} is a question — may need an input slot or human_decision`,
+        related: [section.id],
+      });
+    }
+  }
+
+  for (const s of source.steering) {
+    const cid = `c_${s.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16)}`;
+    const effect =
+      s.verb === "affirm" ? "invariant" : s.verb === "reject" ? "forbidden" : "decision_rule";
+    const statement = s.note?.trim() || `${s.verb} on ${s.target_kind} ${s.target_id}`;
+    constraints.push({
+      kind: "steering_constraint",
+      id: cid,
+      verb: s.verb,
+      effect,
+      statement,
+      source_steering_id: s.id,
+      targets: [s.target_id],
+      provenance: [{ kind: "steering", id: s.id }],
+    });
+    mappings.push({
+      from: { kind: "steering", id: s.id },
+      to: { kind: "constraint", id: cid },
+    });
+  }
+
+  if (steps.length === 0 && knowledge.length > 0) {
+    steps.push({
+      id: "s_apply_knowledge",
+      kind: "instruct",
+      title: "Apply captured knowledge",
+      text:
+        "Follow the pinned knowledge items and steering constraints exactly. Ask only for declared inputs. Resume from journey provenance when continuing prior work.",
+      knowledge_refs: knowledge.map((k) => k.id),
+    });
+  }
+
+  for (let i = 0; i < steps.length - 1; i++) {
+    if (!steps[i]!.next) steps[i]!.next = steps[i + 1]!.id;
+  }
+
+  if (steps.length > 0) {
+    const last = steps[steps.length - 1]!;
+    const verifyId = "s_verify";
+    const emitId = "s_emit";
+    last.next = verifyId;
+    steps.push({
+      id: verifyId,
+      kind: "verify",
+      title: "Verify constraints",
+      assertions: [
+        "all_required_inputs_resolved",
+        ...constraints
+          .filter((c) => c.effect === "invariant")
+          .map((c) => `constraint_present:${c.id}`),
+      ],
+      next: emitId,
+    });
+    steps.push({
+      id: emitId,
+      kind: "emit",
+      title: "Emit result",
+      output: "result",
+      from: last.id,
+    });
+  }
+
+  const pending: string[] = [];
+  for (const slot of inferredInputs) {
+    if (!slot.approved) pending.push(`input:${slot.name}`);
+    mappings.push({
+      from: slot.provenance?.[0] ?? { kind: "author", id: "compiler" },
+      to: { kind: "input", id: slot.name },
+    });
+  }
+
+  const needsCodeWrite = source.sections.some((i) => i.type === "code");
+  const permissions = needsCodeWrite
+    ? [
+        {
+          side_effect_class: "write" as const,
+          description: "May modify project files when applying code knowledge",
+          requires_consent: true,
+        },
+      ]
+    : [];
+  if (needsCodeWrite && !opts.approve_permissions) {
+    pending.push("permission:write");
+    issues.push({
+      severity: "warning",
+      code: "permission_approval",
+      message: "Write permission inferred from code sections — requires human approval",
+    });
+  }
+
+  // Explicit "no inputs" declaration when none inferred
+  const hasInputsDeclared =
+    inferredInputs.length > 0 || source.inputs_declared === "none";
+  const safeJourney = {
+    ...source.journey,
+    summary: redactSecrets(source.journey.summary),
+    open_questions: source.journey.open_questions?.map(redactSecrets),
+    decisions: source.journey.decisions?.map(redactSecrets),
+    redacted: true,
+  };
+
+  const usage = opts.generation_usage ?? source.generation_usage;
+  const completeness = assessCompleteness(source, {
+    profile,
+    hasWorkflowAction:
+      sectionHasWorkflowAction(source.sections) || source.prompts.length > 0,
+    hasKnowledge: knowledge.length > 0,
+    hasInputsDeclared,
+    pendingApprovals: pending,
+  });
+
+  if (!completeness.complete && !opts.allow_incomplete && profile === "release") {
+    throw new CompileRefusalError(completeness);
+  }
+  if (!completeness.complete && profile === "continuity") {
+    // continuity still requires hard parts
+    const hard = completeness.missing.filter((m) =>
+      ["agent_context", "sections", "intent", "journey", "knowledge_or_prompts"].includes(m),
+    );
+    if (hard.length && !opts.allow_incomplete) {
+      throw new CompileRefusalError({ ...completeness, missing: hard, complete: false });
+    }
+  }
+
+  if (inferredInputs.some((i) => !i.approved)) {
+    issues.push({
+      severity: "info",
+      code: "pending_input_approval",
+      message: "Inferred input slots require human approval before release mint",
+    });
+  }
+
+  if (!steps.length) {
+    // continuity with only questions etc.
+    steps.push({
+      id: "s_resume",
+      kind: "instruct",
+      title: "Resume continuity",
+      text: source.journey.summary || "Continue from open questions in provenance.",
+      knowledge_refs: knowledge.map((k) => k.id),
+    });
+    steps.push({
+      id: "s_emit",
+      kind: "emit",
+      title: "Emit result",
+      output: "result",
+      from: "s_resume",
+    });
+    steps[0]!.next = "s_emit";
+  }
+
+  const entrypoint = steps[0]!.id;
+  const report: CompilationReport = {
+    kind: "compilation_report",
+    skill_id: skillId,
+    source_id: source.id,
+    recipe_id: source.source_refs?.find((r) => r.kind === "recipe")?.id,
+    profile,
+    created_at: new Date().toISOString(),
+    mappings,
+    inferred_inputs: inferredInputs,
+    issues,
+    pending_approvals: pending,
+    approved: pending.length === 0,
+    completeness,
+  };
+
+  const files: SkillPackageFiles = {
+    manifest: {
+      kind: "dot-skill",
+      id: skillId,
+      version,
+      title: opts.title ?? source.title,
+      description:
+        opts.description ??
+        source.summary ??
+        `Skill compiled from source ${source.id}`,
+      intent: source.intent ?? source.summary,
+      triggers: [source.title],
+      authors: source.actor ? [source.actor] : undefined,
+      container_version: CONTAINER_VERSION,
+      protocol_version: PROTOCOL_VERSION,
+      entrypoint,
+      inputs: inferredInputs,
+      outputs: [
+        {
+          name: "result",
+          description: "Primary textual or structured result of the skill",
+          schema: { type: "string" },
+          required: true,
+        },
+      ],
+      capabilities: needsCodeWrite
+        ? [
+            {
+              name: "filesystem.write",
+              description: "Write files in the workspace",
+              side_effect_class: "write",
+              fallback: "ask_human",
+              required: false,
+              adapters: [{ kind: "host", name: "workspace" }],
+            },
+          ]
+        : [],
+      permissions,
+      policy: { ...DEFAULT_SKILL_POLICY },
+      content: [],
+      package_digest: "sha256:" + "0".repeat(64),
+      provenance_mode: opts.provenance_mode ?? (profile === "continuity" ? "redacted" : "full"),
+      compile_profile: profile,
+      completeness,
+      package_sensitivity: source.sensitivity,
+      mint: { mint_status: "draft" },
+      needs_human_review: pending.length > 0 || profile === "continuity",
+    },
+    workflow: {
+      kind: "workflow",
+      dialect_version: WORKFLOW_DIALECT_VERSION,
+      entrypoint,
+      steps,
+      constraints,
+    },
+    knowledge,
+    prompts: source.prompts.length
+      ? Object.fromEntries(
+          source.prompts.map((prompt) => [
+            `${prompt.id}.txt`,
+            redactSecrets(prompt.body),
+          ]),
+        )
+      : undefined,
+    provenance: {
+      source:
+        opts.provenance_mode === "proof_only"
+          ? undefined
+          : {
+              id: source.id,
+              hash: source.hash,
+              title: source.title,
+              agent: {
+                ...source.agent,
+                endpoint: source.agent.endpoint
+                  ? redactSecrets(source.agent.endpoint)
+                  : undefined,
+              },
+              sensitivity: source.sensitivity,
+              section_ids: source.sections.map((s) => `${s.id}@${s.revision}`),
+              source_refs: source.source_refs,
+            },
+      journey: safeJourney,
+      generation_usage: usage,
+      proof: {
+        source_id: source.id,
+        source_hash: source.hash,
+        section_ids: source.sections.map((s) => `${s.id}@${s.revision}`),
+        agent_host: source.agent.host,
+      },
+      compilation_report: report,
+    },
+  };
+
+  const fileMap = buildFileMap(files);
+  files.manifest = finalizeManifest(files.manifest, fileMap);
+  const packageBytes = packSkill(files);
+
+  return {
+    files,
+    report,
+    packageBytes,
+    pending_approvals: pending,
+    completeness,
+  };
+}
+
+/** Skillerr / legacy adapter entry — converts Recipe then compiles. */
+export function compileRecipeToSkill(
+  recipe: Recipe,
+  opts: CompileOptions & { host?: string; model?: string } = {},
+): CompileResult {
+  const source = recipeToSkillSource(recipe, {
+    agent: {
+      host: opts.host ?? recipe.provenance.hosts[0],
+      model: opts.model ?? recipe.provenance.models[0],
+    },
+  });
+  if (opts.generation_usage) source.generation_usage = opts.generation_usage;
+  return compileSkillSource(source, opts);
+}
+
+export function approveCompilation(
+  result: CompileResult,
+  approvals: { inputs?: string[]; permissions?: boolean },
+): CompileResult {
+  const files = structuredClone(result.files) as SkillPackageFiles;
+  for (const slot of files.manifest.inputs) {
+    if (
+      !approvals.inputs ||
+      approvals.inputs.includes(slot.name) ||
+      approvals.inputs.includes("*")
+    ) {
+      slot.approved = true;
+    }
+  }
+  const pending = files.manifest.inputs
+    .filter((i) => !i.approved)
+    .map((i) => `input:${i.name}`);
+  if (files.manifest.permissions.some((p) => p.requires_consent) && !approvals.permissions) {
+    pending.push(
+      ...files.manifest.permissions
+        .filter((p) => p.requires_consent)
+        .map((p) => `permission:${p.side_effect_class}`),
+    );
+  }
+  files.manifest.needs_human_review =
+    pending.length > 0 || files.manifest.compile_profile === "continuity";
+  if (files.provenance?.compilation_report) {
+    files.provenance.compilation_report.pending_approvals = pending;
+    files.provenance.compilation_report.approved = pending.length === 0;
+    files.provenance.compilation_report.inferred_inputs = files.manifest.inputs;
+    if (files.provenance.compilation_report.completeness) {
+      const c = files.provenance.compilation_report.completeness;
+      if (pending.length === 0) {
+        c.missing = c.missing.filter((m) => m !== "human_approvals");
+        if (!c.present.includes("human_approvals")) c.present.push("human_approvals");
+        c.complete = c.missing.length === 0;
+      }
+      files.manifest.completeness = c;
+    }
+  }
+  const fileMap = buildFileMap(files);
+  files.manifest = finalizeManifest(files.manifest, fileMap);
+  return {
+    files,
+    report: files.provenance!.compilation_report!,
+    packageBytes: packSkill(files),
+    pending_approvals: pending,
+    completeness: files.manifest.completeness!,
+  };
+}

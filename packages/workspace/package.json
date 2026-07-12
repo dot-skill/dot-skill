@@ -1,0 +1,42 @@
+{
+  "name": "@dot-skill/workspace",
+  "version": "0.4.1",
+  "description": "Git-like local .skill workspace — sections, stage, compile, checkpoint, mint",
+  "license": "MIT",
+  "author": {
+    "name": "Bharat Dudeja",
+    "url": "https://github.com/bharatdudeja13-cmd"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dot-skill/dot-skill.git",
+    "directory": "packages/workspace"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@dot-skill/core": "^0.4.1",
+    "@dot-skill/protocol": "^0.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "typescript": "^5.8.3"
+  }
+}

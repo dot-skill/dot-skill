@@ -1,0 +1,18 @@
+name: Good first issue
+description: Small, well-scoped task for new contributors
+labels: ["good first issue"]
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: Task
+      description: Exact files to touch and definition of done.
+    validations:
+      required: true
+  - type: textarea
+    id: tips
+    attributes:
+      label: Tips
+      description: Commands to run, related docs.
+    validations:
+      required: false

@@ -1,0 +1,48 @@
+{
+  "name": "@dot-skill/cli",
+  "version": "0.4.1",
+  "description": "skill — Open .skill Protocol CLI (continuity and release workflows)",
+  "license": "MIT",
+  "author": {
+    "name": "Bharat Dudeja",
+    "url": "https://github.com/bharatdudeja13-cmd"
+  },
+  "type": "module",
+  "bin": {
+    "skill": "./dist/cli.js",
+    "dot-skill": "./dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dot-skill/dot-skill.git",
+    "directory": "packages/cli"
+  },
+  "files": [
+    "dist/cli.js",
+    "dist/cli.d.ts",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "prepack": "npm run build",
+    "test": "node --test dist/conformance.test.js"
+  },
+  "dependencies": {
+    "@dot-skill/core": "^0.4.1",
+    "@dot-skill/protocol": "^0.4.1",
+    "@dot-skill/registry": "^0.4.1",
+    "@dot-skill/runtime": "^0.4.1",
+    "@dot-skill/workspace": "^0.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

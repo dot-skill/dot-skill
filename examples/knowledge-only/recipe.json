@@ -1,0 +1,59 @@
+{
+  "kind": "recipe",
+  "id": "rcp_knowledge_only",
+  "hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "title": "Knowledge-only writing style",
+  "summary": "Apply pinned writing constraints without tools",
+  "journey_summary": "Human+AI pinned writing tone and forbidden filler phrases.",
+  "ingredients": [
+    {
+      "id": "ing_style",
+      "revision": 1,
+      "type": "decision",
+      "title": "Tone",
+      "body": "Write in plain, direct prose. Prefer short sentences.",
+      "attachments": [],
+      "code_refs": [],
+      "sensitivity": "publishable"
+    },
+    {
+      "id": "ing_forbid",
+      "revision": 1,
+      "type": "lesson",
+      "title": "No filler",
+      "body": "Never open with 'In today's fast-paced world'.",
+      "attachments": [],
+      "code_refs": [],
+      "sensitivity": "publishable"
+    }
+  ],
+  "steering": [
+    {
+      "kind": "steering",
+      "id": "st_affirm",
+      "session_id": "ses_ex",
+      "verb": "affirm",
+      "target_kind": "ingredient",
+      "target_id": "ing_style",
+      "note": "Keep this tone exact",
+      "actor": { "id": "author" },
+      "at": "2026-07-12T00:00:00.000Z"
+    }
+  ],
+  "prompts": [],
+  "code_refs": [],
+  "parents": [],
+  "provenance": { "hosts": ["cursor"], "models": ["example"], "session_ids": ["ses_ex"] },
+  "visibility_intent": "publishable",
+  "baked_at": "2026-07-12T00:00:00.000Z",
+  "baker": { "id": "author" },
+  "source_protocol_version": "0.4.0",
+  "generation_usage": {
+    "input_tokens": 80,
+    "output_tokens": 40,
+    "total_tokens": 120,
+    "reported_by": "estimated",
+    "captured_at": "2026-07-12T00:00:00.000Z",
+    "host": "cursor"
+  }
+}

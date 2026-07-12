@@ -1,0 +1,59 @@
+{
+  "kind": "recipe",
+  "id": "rcp_param_integration",
+  "hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "title": "Parameterized API integration",
+  "summary": "Call {{base_url}} with a secret credential ref",
+  "journey_summary": "Human+AI designed a parameterized HTTP client; secrets stay as refs.",
+  "ingredients": [
+    {
+      "id": "ing_api",
+      "revision": 1,
+      "type": "integration",
+      "title": "HTTP client setup",
+      "body": "POST {{base_url}}/v1/events with Authorization Bearer {{api_credential_ref}}. Timeout 10s.",
+      "attachments": [],
+      "code_refs": [],
+      "sensitivity": "private"
+    },
+    {
+      "id": "ing_retry",
+      "revision": 1,
+      "type": "implementation_note",
+      "title": "Retries",
+      "body": "Retry twice on HTTP 429 with exponential backoff.",
+      "attachments": [],
+      "code_refs": [],
+      "sensitivity": "publishable"
+    }
+  ],
+  "steering": [
+    {
+      "kind": "steering",
+      "id": "st_reject_secrets",
+      "session_id": "ses_ex",
+      "verb": "reject",
+      "target_kind": "ingredient",
+      "target_id": "ing_api",
+      "note": "Never embed raw API keys in the skill",
+      "actor": { "id": "author" },
+      "at": "2026-07-12T00:00:00.000Z"
+    }
+  ],
+  "prompts": [],
+  "code_refs": [],
+  "parents": [],
+  "provenance": { "hosts": ["cursor"], "models": ["example"], "session_ids": ["ses_ex"] },
+  "visibility_intent": "private",
+  "baked_at": "2026-07-12T00:00:00.000Z",
+  "baker": { "id": "author" },
+  "source_protocol_version": "0.4.0",
+  "generation_usage": {
+    "input_tokens": 100,
+    "output_tokens": 50,
+    "total_tokens": 150,
+    "reported_by": "estimated",
+    "captured_at": "2026-07-12T00:00:00.000Z",
+    "host": "cursor"
+  }
+}

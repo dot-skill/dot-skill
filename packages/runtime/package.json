@@ -1,0 +1,43 @@
+{
+  "name": "@dot-skill/runtime",
+  "version": "0.4.1",
+  "description": "Open .skill Protocol — reference workflow runtime",
+  "license": "MIT",
+  "author": {
+    "name": "Bharat Dudeja",
+    "url": "https://github.com/bharatdudeja13-cmd"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dot-skill/dot-skill.git",
+    "directory": "packages/runtime"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "prepack": "npm run build",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@dot-skill/core": "^0.4.1",
+    "@dot-skill/protocol": "^0.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^5.4.5"
+  }
+}

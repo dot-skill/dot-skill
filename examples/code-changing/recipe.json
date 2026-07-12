@@ -1,0 +1,59 @@
+{
+  "kind": "recipe",
+  "id": "rcp_code_changing",
+  "hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "title": "Code-changing workflow",
+  "summary": "Apply a small code change with write permission consent",
+  "journey_summary": "Human+AI agreed a scoped health-route change with verification.",
+  "ingredients": [
+    {
+      "id": "ing_code",
+      "revision": 1,
+      "type": "code",
+      "title": "Add health route",
+      "body": "Add GET /health returning {\"ok\":true} in the existing HTTP server.",
+      "attachments": [],
+      "code_refs": [],
+      "sensitivity": "private"
+    },
+    {
+      "id": "ing_test",
+      "revision": 1,
+      "type": "requirement",
+      "title": "Verification",
+      "body": "Verify /health returns 200 before finishing.",
+      "attachments": [],
+      "code_refs": [],
+      "sensitivity": "publishable"
+    }
+  ],
+  "steering": [
+    {
+      "kind": "steering",
+      "id": "st_correct",
+      "session_id": "ses_ex",
+      "verb": "correct",
+      "target_kind": "ingredient",
+      "target_id": "ing_code",
+      "note": "Do not refactor unrelated modules",
+      "actor": { "id": "author" },
+      "at": "2026-07-12T00:00:00.000Z"
+    }
+  ],
+  "prompts": [],
+  "code_refs": [],
+  "parents": [],
+  "provenance": { "hosts": ["cursor"], "models": ["example"], "session_ids": ["ses_ex"] },
+  "visibility_intent": "private",
+  "baked_at": "2026-07-12T00:00:00.000Z",
+  "baker": { "id": "author" },
+  "source_protocol_version": "0.4.0",
+  "generation_usage": {
+    "input_tokens": 120,
+    "output_tokens": 60,
+    "total_tokens": 180,
+    "reported_by": "estimated",
+    "captured_at": "2026-07-12T00:00:00.000Z",
+    "host": "cursor"
+  }
+}

@@ -1,0 +1,25 @@
+name: Bug report
+description: Something broken in pack, mint, runtime, or registry
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Clear description and expected vs actual behavior.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: "0.3.0 or commit SHA"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal commands or fixture (no secrets).
+    validations:
+      required: true
