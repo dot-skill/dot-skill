@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import type {
   CapabilityAdapterHint,
   CapabilityRequirement,
@@ -52,8 +53,17 @@ export interface RunOptions {
   issuer_secret?: string;
 }
 
-const RUNTIME_NAME = "@dot-skill/runtime";
-const RUNTIME_VERSION = "0.4.1";
+function loadRuntimeIdentity(): { name: string; version: string } {
+  const metadata = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as { name?: unknown; version?: unknown };
+  if (typeof metadata.name !== "string" || typeof metadata.version !== "string") {
+    throw new Error("Invalid @dot-skill/runtime package metadata");
+  }
+  return { name: metadata.name, version: metadata.version };
+}
+
+const { name: RUNTIME_NAME, version: RUNTIME_VERSION } = loadRuntimeIdentity();
 
 function substitute(template: string, inputs: Record<string, unknown>): string {
   return template.replace(/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g, (_, name: string) => {

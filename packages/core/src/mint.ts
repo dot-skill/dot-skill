@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type {
   CreationAttestation,
   PermanenceAnchor,
@@ -27,6 +28,18 @@ export interface MintOptions {
   issuer_secret?: string;
   policy_profile?: TrustProfile;
 }
+
+function loadCoreIdentity(): { name: string; version: string } {
+  const metadata = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as { name?: unknown; version?: unknown };
+  if (typeof metadata.name !== "string" || typeof metadata.version !== "string") {
+    throw new Error("Invalid @dot-skill/core package metadata");
+  }
+  return { name: metadata.name, version: metadata.version };
+}
+
+const CORE_IDENTITY = loadCoreIdentity();
 
 /**
  * Seal a draft package as minted.
@@ -80,6 +93,10 @@ export function mintSkillPackage(
   const unpacked = unpackSkill(draftBytes);
   const package_digest = unpacked.manifest.package_digest;
 
+  const agentRuntime = opts.agent_runtime ?? CORE_IDENTITY.name;
+  const agentVersion =
+    opts.agent_version ?? (agentRuntime === CORE_IDENTITY.name ? CORE_IDENTITY.version : "unknown");
+
   const attestation: CreationAttestation = {
     kind: "creation_attestation",
     package_digest,
@@ -87,8 +104,8 @@ export function mintSkillPackage(
     skill_version: pkg.manifest.version,
     minted_at: new Date().toISOString(),
     agent: {
-      runtime: opts.agent_runtime ?? "@dot-skill/runtime",
-      version: opts.agent_version ?? "0.4.0",
+      runtime: agentRuntime,
+      version: agentVersion,
       key_id: opts.key_id ?? "dot-skill-dev-mint-key",
     },
     host: opts.host,

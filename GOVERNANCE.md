@@ -8,7 +8,7 @@
 | Candidate | Feature-complete; breaking changes need RFC |
 | Stable | Two independent runtimes pass the same conformance corpus |
 
-**0.4.1** is **Draft**.
+**0.4.3** is **Draft**.
 
 ## Project
 

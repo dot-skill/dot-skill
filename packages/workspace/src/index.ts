@@ -11,7 +11,7 @@
  */
 
 import { mkdir, readFile, writeFile, readdir, unlink } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import type {
@@ -419,6 +419,18 @@ async function toSkillSource(
   };
 }
 
+function loadWorkspaceIdentity(): { name: string; version: string } {
+  const metadata = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as { name?: unknown; version?: unknown };
+  if (typeof metadata.name !== "string" || typeof metadata.version !== "string") {
+    throw new Error("Invalid @dot-skill/workspace package metadata");
+  }
+  return { name: metadata.name, version: metadata.version };
+}
+
+const WORKSPACE_IDENTITY = loadWorkspaceIdentity();
+
 export interface CompileWorkspaceOptions {
   title?: string;
   summary?: string;
@@ -428,6 +440,8 @@ export interface CompileWorkspaceOptions {
   mint?: boolean;
   profile?: SkillCompileProfile;
   host?: string;
+  agent_runtime?: string;
+  agent_version?: string;
   generation_usage?: GenerationUsage;
   input_tokens?: number;
   output_tokens?: number;
@@ -524,6 +538,12 @@ export async function compileWorkspace(
     if (profile !== "release") {
       throw new Error("Mint only allowed with --profile release (not continuity drafts).");
     }
+    const agentRuntime =
+      process.env.SKILL_AGENT_RUNTIME ?? opts.agent_runtime ?? WORKSPACE_IDENTITY.name;
+    const agentVersion =
+      process.env.SKILL_AGENT_VERSION ??
+      opts.agent_version ??
+      (agentRuntime === WORKSPACE_IDENTITY.name ? WORKSPACE_IDENTITY.version : "unknown");
     const sealed = mintSkillPackage(compiled.files, {
       host: requireAgentHost(opts.host),
       provider: process.env.SKILL_PROVIDER,
@@ -538,7 +558,8 @@ export async function compileWorkspace(
         ? redactSecrets(process.env.SKILL_ENDPOINT)
         : undefined,
       actors: [process.env.SKILL_ACTOR ?? "human"],
-      agent_runtime: process.env.SKILL_AGENT_RUNTIME ?? "@dot-skill/cli",
+      agent_runtime: agentRuntime,
+      agent_version: agentVersion,
     });
     bytes = sealed.packageBytes;
     compiled = { ...compiled, files: sealed.files, packageBytes: sealed.packageBytes };

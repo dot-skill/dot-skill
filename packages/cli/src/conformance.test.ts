@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   canonicalize,
@@ -30,6 +32,7 @@ import { runSkillArchive, runSkillPackage } from "@dot-skill/runtime";
 import { publish, lookup, list } from "@dot-skill/registry";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const demoRecipe = (): Recipe => ({
   kind: "recipe",
@@ -91,6 +94,23 @@ const demoRecipe = (): Recipe => ({
     host: "cursor",
     model: "test-model",
   },
+});
+
+function packageIdentity(relativeUrl: string): { name: string; version: string } {
+  return JSON.parse(readFileSync(new URL(relativeUrl, import.meta.url), "utf8")) as {
+    name: string;
+    version: string;
+  };
+}
+
+test("CLI version comes from its package metadata", () => {
+  const cli = packageIdentity("../package.json");
+  const output = execFileSync(
+    process.execPath,
+    [fileURLToPath(new URL("./cli.js", import.meta.url)), "--version"],
+    { encoding: "utf8" },
+  );
+  assert.equal(output, `${cli.version}\n`);
 });
 
 test("canonicalize sorts object keys", () => {
@@ -250,6 +270,8 @@ test("recipe/source compile produces traceable skill and runtime dry_run", async
   assert.equal(run.status, "succeeded");
   assert.ok(run.steps.length > 0);
   assert.ok(run.package_digest.startsWith("sha256:"));
+  assert.equal(run.runtime.name, packageIdentity("../../runtime/package.json").name);
+  assert.equal(run.runtime.version, packageIdentity("../../runtime/package.json").version);
 });
 
 test("digest helper", () => {
@@ -268,11 +290,13 @@ test("mint seals package and verify-trust accepts minted profile", () => {
   compiled = approveCompilation(compiled, { inputs: ["*"], permissions: true });
   compiled.files.manifest.needs_human_review = false;
   const before = compiled.files.manifest.package_digest;
-  const { packageBytes, files } = mintSkillPackage(compiled.files, { host: "cursor" });
+  const { packageBytes, files, attestation } = mintSkillPackage(compiled.files, { host: "cursor" });
   assert.equal(files.manifest.mint?.mint_status, "minted");
   assert.equal(files.manifest.package_digest, before);
   assert.equal(files.manifest.mint?.content_id, before);
   assert.ok(files.attestation?.generation_usage?.total_tokens === 1600);
+  assert.equal(attestation.agent.runtime, packageIdentity("../../core/package.json").name);
+  assert.equal(attestation.agent.version, packageIdentity("../../core/package.json").version);
   const trust = verifyMintTrust(packageBytes, "minted");
   assert.equal(trust.ok, true, JSON.stringify(trust.issues));
   const anchored = addPermanenceAnchor(packageBytes, {
@@ -411,11 +435,15 @@ test("workspace continuity checkpoint + release compile --mint", async () => {
   const dir = mkdtempSync(join(tmpdir(), "skill-ws-"));
   const prev = process.cwd();
   const prevHost = process.env.SKILL_HOST;
+  const prevAgentRuntime = process.env.SKILL_AGENT_RUNTIME;
+  const prevAgentVersion = process.env.SKILL_AGENT_VERSION;
   process.chdir(dir);
   process.env.SKILL_HOST = "cursor";
   process.env.SKILL_MODEL = "test";
   process.env.SKILL_INPUT_TOKENS = "100";
   process.env.SKILL_OUTPUT_TOKENS = "50";
+  delete process.env.SKILL_AGENT_RUNTIME;
+  delete process.env.SKILL_AGENT_VERSION;
   try {
     const {
       initWorkspace,
@@ -459,10 +487,16 @@ test("workspace continuity checkpoint + release compile --mint", async () => {
     assert.equal(result.minted, true);
     assert.ok(result.package_digest.startsWith("sha256:"));
     assert.ok(result.compile.files.provenance?.generation_usage?.total_tokens === 150);
+    assert.equal(result.compile.files.attestation?.agent.runtime, packageIdentity("../../workspace/package.json").name);
+    assert.equal(result.compile.files.attestation?.agent.version, packageIdentity("../../workspace/package.json").version);
   } finally {
     process.chdir(prev);
     if (prevHost === undefined) delete process.env.SKILL_HOST;
     else process.env.SKILL_HOST = prevHost;
+    if (prevAgentRuntime === undefined) delete process.env.SKILL_AGENT_RUNTIME;
+    else process.env.SKILL_AGENT_RUNTIME = prevAgentRuntime;
+    if (prevAgentVersion === undefined) delete process.env.SKILL_AGENT_VERSION;
+    else process.env.SKILL_AGENT_VERSION = prevAgentVersion;
   }
 });
 

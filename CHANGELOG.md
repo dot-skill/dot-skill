@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.3 — 2026-07-13
+
+- Derived CLI, runtime, and attestation package versions from shipped package metadata.
+- Added conformance coverage for package version reporting.
+
 ## 0.4.1 — 2026-07-12
 
 - Added local and offline agent provenance fields.

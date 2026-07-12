@@ -13,6 +13,7 @@
  *   skill load ./file.skill          # resume handoff in another AI
  */
 
+import { readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
@@ -50,7 +51,17 @@ import {
   requireAgentHost,
 } from "@dot-skill/workspace";
 
-const VERSION = "0.4.1";
+function loadPackageVersion(): string {
+  const metadata = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as { version?: unknown };
+  if (typeof metadata.version !== "string" || metadata.version.length === 0) {
+    throw new Error("Invalid @dot-skill/cli package version metadata");
+  }
+  return metadata.version;
+}
+
+const VERSION = loadPackageVersion();
 
 function usage(exitCode = 1): never {
   console.log(`skill — Open .skill Protocol CLI v${VERSION}
@@ -79,7 +90,7 @@ Package tools:
 
 Env (agents):
   SKILL_HOST (required)  SKILL_PROVIDER  SKILL_MODEL  SKILL_DEPLOYMENT
-  SKILL_ENDPOINT  SKILL_ACTOR  SKILL_AGENT_RUNTIME
+  SKILL_ENDPOINT  SKILL_ACTOR  SKILL_AGENT_RUNTIME  SKILL_AGENT_VERSION
   SKILL_INPUT_TOKENS  SKILL_OUTPUT_TOKENS  SKILL_SESSION_ID
 
 Install: npm i -g @dot-skill/cli   or   npx @dot-skill/cli …
@@ -310,6 +321,10 @@ async function main() {
           mint: flag(rest, "--mint"),
           profile,
           host: opt(rest, "--host"),
+          agent_runtime: process.env.SKILL_AGENT_RUNTIME ?? "@dot-skill/cli",
+          agent_version:
+            process.env.SKILL_AGENT_VERSION ??
+            (process.env.SKILL_AGENT_RUNTIME ? "unknown" : VERSION),
           input_tokens: opt(rest, "--input-tokens")
             ? Number(opt(rest, "--input-tokens"))
             : undefined,
@@ -402,6 +417,9 @@ async function main() {
           ? redactSecrets(process.env.SKILL_ENDPOINT)
           : undefined,
         agent_runtime: process.env.SKILL_AGENT_RUNTIME ?? "@dot-skill/cli",
+        agent_version:
+          process.env.SKILL_AGENT_VERSION ??
+          (process.env.SKILL_AGENT_RUNTIME ? "unknown" : VERSION),
       });
       const out = opt(rest, "-o") ?? file;
       await writeFile(resolve(out!), packageBytes);
