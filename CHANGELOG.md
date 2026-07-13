@@ -1,10 +1,15 @@
 # Changelog
 
+## 0.6.1 — 2026-07-13
+
+- Ship Dotling brand mark assets in the public `skillerr` npm package.
+- Keep repository links on live `dot-skill/dot-skill` until the GitHub rename to `dot-skill/skillerr`.
+
 ## 0.6.0 — 2026-07-13
 
 - Renamed npm scope from `@dot-skill/*` to `@skillerr/*` (protocol, core, runtime, registry, workspace, cli).
 - Public install remains `npm i -g skillerr` (bins: `skill`, `skillerr`).
-- Homepage and docs point to [skillerr.com](https://skillerr.com); repository URLs use `skillerr/skillerr`.
+- Homepage and docs point to [skillerr.com](https://skillerr.com); repository URLs track the live GitHub repo (`dot-skill/dot-skill` until renamed to `dot-skill/skillerr`).
 - Local registry default path is `~/.skillerr/registry/log.jsonl` (reads legacy `~/.dot-skill/…` if present).
 - Preserved `.skill` artifact extension and wire identifiers (`kind: "dot-skill"`, `application/vnd.dot-skill+zip`).
 

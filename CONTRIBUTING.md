@@ -28,7 +28,7 @@ change under the MIT License.
 ## Dev setup
 
 ```bash
-git clone https://github.com/dot-skill/skillerr.git
+git clone https://github.com/dot-skill/dot-skill.git
 cd dot-skill
 npm install
 npm test

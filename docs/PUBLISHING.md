@@ -48,7 +48,7 @@ Root is `"private": true`. Publish order (also used by `.github/workflows/publis
 
 Skip unscoped `dot-skill` and `skill` (owned by others). Scoped `@skillerr/*` packages use `"publishConfig": { "access": "public", "provenance": true }`. Unscoped `skillerr` uses `"publishConfig": { "provenance": true }`.
 
-Each package `repository.url` must match the GitHub repository that runs the workflow (currently `https://github.com/dot-skill/skillerr.git`). Provenance and trusted publishing require an exact match.
+Each package `repository.url` must match the GitHub repository that runs the workflow (currently `https://github.com/dot-skill/dot-skill.git`). Provenance and trusted publishing require an exact match.
 
 ## One-time: npm org and login
 
@@ -78,7 +78,7 @@ For each of:
 3. Under **Select your publisher**, choose **GitHub Actions**.
 4. Fill in exactly:
    - **Organization or user:** `dot-skill`
-   - **Repository:** `skillerr`
+   - **Repository:** `dot-skill` (live name until renamed to `skillerr`)
    - **Workflow filename:** `publish.yml` (filename only, not a path)
    - **Environment name:** leave empty (this repo does not use a GitHub Environment for publish)
    - **Allowed actions:** select **`npm publish`** (required for direct publish)
@@ -87,6 +87,7 @@ For each of:
 Notes:
 
 - Values are case-sensitive and must match the repo that runs Actions.
+- Desired public name is `dot-skill/skillerr`. Until that rename lands, Trusted Publisher + `repository.url` must match live `dot-skill/dot-skill`.
 - If the GitHub repo is renamed later, update every package’s Trusted Publisher fields and every `package.json` `repository.url` in the same change.
 - After Trusted Publishing works, optionally go to **Settings → Publishing access** and select **Require two-factor authentication and disallow tokens**, then revoke old automation tokens.
 

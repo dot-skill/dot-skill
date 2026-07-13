@@ -10,7 +10,7 @@ fi
 echo "Installing skillerr…"
 if ! npm install -g skillerr@latest; then
   echo "npm install failed — from source:"
-  echo "  git clone https://github.com/dot-skill/skillerr.git && cd skillerr"
+  echo "  git clone https://github.com/dot-skill/dot-skill.git && cd dot-skill"
   echo "  npm i && npm run build && npm link -w skillerr"
   exit 1
 fi

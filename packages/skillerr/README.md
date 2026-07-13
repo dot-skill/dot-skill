@@ -10,7 +10,7 @@ Reference CLI for **Skillerr** — portable `.skill` packages for AI agents.
 
 You install once. Then you **point your AI** at Skillerr. The agent creates, inspects, hands off, and dry-runs skills; you review and approve releases.
 
-**Bin:** `skill` · **Site:** [skillerr.com](https://skillerr.com) · **Format:** `.skill` · **Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr) · **License:** MIT
+**Bin:** `skill` · **Site:** [skillerr.com](https://skillerr.com) · **Format:** `.skill` · **Repo:** [dot-skill/dot-skill](https://github.com/dot-skill/dot-skill) · **License:** MIT
 
 [![npm](https://img.shields.io/npm/v/skillerr.svg)](https://www.npmjs.com/package/skillerr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../LICENSE)
