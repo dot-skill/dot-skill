@@ -57,6 +57,17 @@ names exactly what still needs authoring (almost always
 reviewed it) — tell the human what's listed there, do not claim it's
 release-ready until they have.
 
+## Eval a skill against its test prompts (what you run)
+
+```bash
+skill eval . --host cursor --responses responses.json --attach
+skill compile -m "…" --approve   # next compile seals provenance/benchmark.json
+```
+
+Only grade what you can honestly check. `pending_human` on an assertion
+means exactly that — don't report it to the human as passed. See
+[docs/EVAL.md](./EVAL.md).
+
 ## Ingest / load / run (what you run)
 
 ```bash

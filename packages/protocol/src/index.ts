@@ -72,6 +72,10 @@ export type {
   SkillPackageFiles,
   SkillStepRecord,
   SkillRun,
+  AssertionGradeStatus,
+  AssertionResult,
+  EvalCaseResult,
+  BenchmarkReport,
 } from "./types.js";
 
 export {
@@ -135,6 +139,7 @@ export type {
   ContractIssue,
   ContractAssessment,
   SkillCandidate,
+  EvalCase,
 } from "./contract.js";
 
 export type {

@@ -35,6 +35,19 @@ layer above it. A worked example lives at
 
 ---
 
+## Evaluate a skill against test prompts
+
+```text
+Run the eval cases declared in this workspace's contract with skillerr
+(skill eval . --attach). Grade only what you can honestly check — leave
+anything you're not sure about as pending_human, don't claim it passed.
+Then compile so the benchmark gets sealed into the package.
+```
+
+See [docs/EVAL.md](../docs/EVAL.md).
+
+---
+
 ## Inspect a `.skill` before trusting it
 
 ```text

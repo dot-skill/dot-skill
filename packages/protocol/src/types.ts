@@ -623,6 +623,48 @@ export interface CompilationReport {
   losses?: string[];
 }
 
+/**
+ * PHASE 2: native eval/benchmark loop output. Machine-readable, honest
+ * about what has and hasn't actually been graded — `pending_human` is a
+ * real, common status, not an error state. See docs/EVAL.md.
+ */
+export type AssertionGradeStatus = "pass" | "fail" | "partial" | "pending_human";
+
+export interface AssertionResult {
+  id: string;
+  assertion: string;
+  check: "runtime" | "capability" | "human";
+  status: AssertionGradeStatus;
+  detail?: string;
+}
+
+export interface EvalCaseResult {
+  id: string;
+  prompt: string;
+  /** Did the skill's workflow itself dry-run successfully for this case? */
+  executable: boolean;
+  duration_ms: number;
+  /** Only set when a caller supplies real usage data — never estimated. */
+  total_tokens?: number;
+  assertions: AssertionResult[];
+}
+
+export interface BenchmarkReport {
+  kind: "benchmark_report";
+  skill_id: string;
+  host: string;
+  created_at: string;
+  cases: EvalCaseResult[];
+  summary: {
+    total_cases: number;
+    total_assertions: number;
+    pass: number;
+    fail: number;
+    partial: number;
+    pending_human: number;
+  };
+}
+
 export interface SkillPackageFiles {
   manifest: SkillManifest;
   workflow: Workflow;
@@ -641,6 +683,8 @@ export interface SkillPackageFiles {
     generation_usage?: GenerationUsage;
     proof?: unknown;
     compilation_report?: CompilationReport;
+    /** PHASE 2: sealed into provenance/benchmark.json when `skill eval` ran before compile. */
+    benchmark?: BenchmarkReport;
   };
   signatures?: Record<string, unknown>;
   attestation?: CreationAttestation;

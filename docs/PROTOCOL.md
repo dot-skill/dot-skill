@@ -74,6 +74,14 @@ compiles continuity-only (lossy, loud `contract_missing`/`contract_unparsable`
 report entries); release always refuses without one. See
 [WORKSPACE.md](./WORKSPACE.md).
 
+## Eval / benchmark (Phase 2)
+
+An optional `contract.evals[]` array of test-prompt-plus-assertion cases.
+`skill eval` grades what's honestly machine-checkable, leaves the rest
+`pending_human`, and never fabricates a pass. `skill eval --attach` seals
+the result into `provenance/benchmark.json` on the next compile. See
+[EVAL.md](./EVAL.md).
+
 ## Container
 
 ```text
@@ -85,7 +93,7 @@ example.skill
 ├── resources/
 ├── artifacts/
 ├── assets/icon.*         # optional per-skill icon — see "Format icon slot" below
-├── provenance/          # journey + usage + compilation_report
+├── provenance/          # journey + usage + compilation_report + optional benchmark
 └── signatures/          # attestation + optional anchors
 ```
 
