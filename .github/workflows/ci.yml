@@ -30,3 +30,21 @@ jobs:
       - run: npm test
       - run: npm run test:examples
       - run: npm run pack:check
+
+  brand:
+    # Asset generation is OS-independent (pure JS raster/ICO encoding via
+    # sharp + png-to-ico), so this runs once on ubuntu rather than across
+    # the full matrix above. It proves assets/ is reproducible from
+    # assets/skillerr-mark.svg rather than hand-edited out of sync: any
+    # drift between the checked-in PNGs/ICO and what the SVG produces
+    # fails the build.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/build-brand.mjs
+      - run: git diff --exit-code -- assets/
