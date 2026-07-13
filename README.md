@@ -1,10 +1,6 @@
 # Skillerr
 
 <p align="center">
-  <img src="./assets/skillerr-banner.png" alt=".skill — identity, instructions, capabilities, seal, and assets inside a portable skill package" width="100%" />
-</p>
-
-<p align="center">
   <img src="./assets/skillerr-mark.png" alt="Skillerr .skill mark" width="128" height="128" />
 </p>
 
