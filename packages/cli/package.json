@@ -28,12 +28,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dot-skill/dot-skill.git",
+    "url": "https://github.com/dot-skill/skillerr.git",
     "directory": "packages/cli"
   },
   "homepage": "https://skillerr.com",
   "bugs": {
-    "url": "https://github.com/dot-skill/dot-skill/issues"
+    "url": "https://github.com/dot-skill/skillerr/issues"
   },
   "files": [
     "dist/cli.js",

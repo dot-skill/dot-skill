@@ -1,6 +1,6 @@
 # `@skillerr/runtime`
 
-Reference runtime for the [Open `.skill` Protocol](https://github.com/dot-skill/dot-skill).
+Reference runtime for the [Open `.skill` Protocol](https://github.com/dot-skill/skillerr).
 
 Load a `.skill` archive, verify integrity and trust profile, resolve inputs, and run in **inspect**, **dry_run**, or **execute** modes. Prefer inspect and dry-run before execute.
 
@@ -29,7 +29,7 @@ Fails clearly when required capabilities or minted trust profiles are unmet. Doe
 - [`@skillerr/core`](https://www.npmjs.com/package/@skillerr/core) — pack / validate / mint
 - [`skillerr`](https://www.npmjs.com/package/skillerr) — `skill inspect` / `skill run`
 
-Docs: [RUNTIME.md](https://github.com/dot-skill/dot-skill/blob/main/docs/RUNTIME.md) · [SECURITY.md](https://github.com/dot-skill/dot-skill/blob/main/docs/SECURITY.md)
+Docs: [RUNTIME.md](https://github.com/dot-skill/skillerr/blob/main/docs/RUNTIME.md) · [SECURITY.md](https://github.com/dot-skill/skillerr/blob/main/docs/SECURITY.md)
 
 ## License
 

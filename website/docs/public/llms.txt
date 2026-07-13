@@ -33,7 +33,7 @@ Bin: `skill`. Node ≥ 20.
 
 ## Repository
 
-- GitHub: https://github.com/dot-skill/dot-skill
+- GitHub: https://github.com/dot-skill/skillerr
 - npm: https://www.npmjs.com/package/skillerr
 
 ## Agent prompt (create)

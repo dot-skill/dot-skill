@@ -38,7 +38,7 @@ Typically used via [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill 
 - [`@skillerr/core`](https://www.npmjs.com/package/@skillerr/core) — compile / mint
 - [`skillerr`](https://www.npmjs.com/package/skillerr) — public install / user-facing CLI
 
-Docs: [WORKSPACE.md](https://github.com/dot-skill/dot-skill/blob/main/docs/WORKSPACE.md) · [CONTINUITY.md](https://github.com/dot-skill/dot-skill/blob/main/docs/CONTINUITY.md)
+Docs: [WORKSPACE.md](https://github.com/dot-skill/skillerr/blob/main/docs/WORKSPACE.md) · [CONTINUITY.md](https://github.com/dot-skill/skillerr/blob/main/docs/CONTINUITY.md)
 
 ## License
 

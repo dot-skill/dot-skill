@@ -40,7 +40,7 @@ Skillerr is an open protocol and portable **`.skill`** format so AI agents can a
 
 **Format:** `.skill` (sealed ZIP) · **Status:** Draft 0.5.0  
 **Reference CLI:** [`skillerr`](https://www.npmjs.com/package/skillerr) (bin: `skill`)  
-**Repo:** [dot-skill/dot-skill](https://github.com/dot-skill/dot-skill)
+**Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr)
 
 ## Install once
 

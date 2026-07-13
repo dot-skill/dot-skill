@@ -28,8 +28,8 @@ change under the MIT License.
 ## Dev setup
 
 ```bash
-git clone https://github.com/dot-skill/dot-skill.git
-cd dot-skill
+git clone https://github.com/dot-skill/skillerr.git
+cd skillerr
 npm install
 npm test
 ```

@@ -26,7 +26,7 @@ Maintainer account: **`csinye`** (owner on all seven). Scoped `@skillerr/*` uses
 
 **Do not** document `npm i -g dot-skill` or `npm i -g skill` — those names belong to other publishers.
 
-Each package `repository.url` must be `https://github.com/dot-skill/dot-skill.git` (live repo until rename to `dot-skill/skillerr`).
+Each package `repository.url` must be `https://github.com/dot-skill/skillerr.git`.
 
 Workflow: [`.github/workflows/publish.yml`](../.github/workflows/publish.yml) — `permissions.id-token: write`, publish order above, skips versions already on npm.
 
@@ -47,12 +47,12 @@ Open **Package → Settings → Trusted Publisher → GitHub Actions** and enter
 | Field | Value |
 |-------|-------|
 | **Organization or user** | `dot-skill` |
-| **Repository** | `dot-skill` |
+| **Repository** | `skillerr` |
 | **Workflow filename** | `publish.yml` |
 | **Environment name** | _(leave empty)_ |
 | **Allowed actions** | `npm publish` |
 
-Values are case-sensitive and must match the repo that runs Actions (`dot-skill/dot-skill` today).
+Values are case-sensitive and must match the live repo that runs Actions: **`dot-skill/skillerr`**.
 
 ### Checklist — configure all seven
 
@@ -72,14 +72,14 @@ Official reference: [npm Trusted publishing](https://docs.npmjs.com/trusted-publ
 
 - **Do not** create an org-profile `dot-skill/.github` repo for branding — keep About/README on the product repo only.
 - **Do not** need a classic `NPM_TOKEN` in GitHub Secrets if Trusted Publisher works on all seven packages.
-- **Do not** point Trusted Publisher at `dot-skill/skillerr` until that rename actually exists — use live `dot-skill/dot-skill`.
-- If the repo is renamed later, update **every** package’s Trusted Publisher fields and **every** `package.json` `repository.url` in one commit.
+- **Do not** set Repository to `dot-skill` — that was the old repo name before rename. Use **`skillerr`**.
+- If you previously saved Trusted Publisher with Repository `dot-skill`, edit each package and change it to `skillerr`, then re-run Publish.
 
 ---
 
 ## Publish a release
 
-**Prerequisite:** Trusted Publisher saved on all seven packages.
+**Prerequisite:** Trusted Publisher saved on all seven packages (Repository = `skillerr`).
 
 1. Bump versions in workspace `package.json` files as needed (they need not all match; the workflow **skips** any `name@version` already on npm).
 2. Commit and push to `main`. Confirm CI is green.
@@ -93,7 +93,7 @@ git push origin v0.6.2
 4. The **Publish** workflow runs on tag `v*`: install, test, then publish in order with provenance (OIDC).
 5. **Or** use **Actions → Publish → Run workflow** (`workflow_dispatch`) from the desired ref after versions are bumped — same path, useful right after configuring TP.
 
-`v0.6.1` already exists as a tag; next publish after Shimmer assets is **`0.6.2`** on the `skillerr` meta package (scoped packages may stay at `0.6.0` until bumped — workflow skips unchanged versions).
+`v0.6.1` and `v0.6.2` tags may already exist; if `v0.6.2` Publish failed with `ENEEDAUTH`, fix TP then **Actions → Publish → Run workflow** (no need to re-tag).
 
 ---
 

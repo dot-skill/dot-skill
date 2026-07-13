@@ -1,6 +1,6 @@
 # Fixtures
 
-Conformance `.skill` packages built from the [dot-skill/dot-skill](https://github.com/dot-skill/dot-skill) examples tree. Use them to inspect TrustView, validate digests, and dry-run without inventing your own packages.
+Conformance `.skill` packages built from the [dot-skill/skillerr](https://github.com/dot-skill/skillerr) examples tree. Use them to inspect TrustView, validate digests, and dry-run without inventing your own packages.
 
 Build and test locally:
 
