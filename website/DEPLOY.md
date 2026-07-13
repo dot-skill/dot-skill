@@ -1,6 +1,6 @@
 # Deploy skillerr.com (GitHub Pages)
 
-Free static hosting from **dot-skill/dot-skill** — no paid host, no org `.github` profile repo.
+Free static hosting from **dot-skill/skillerr** — no paid host, no org `.github` profile repo.
 
 ## What ships
 
@@ -11,12 +11,12 @@ Free static hosting from **dot-skill/dot-skill** — no paid host, no org `.gith
 
 ## One-time GitHub setup
 
-1. **dot-skill/dot-skill** → Settings → Pages  
-   - Source: **GitHub Actions**
-2. Settings → Pages → Custom domain: `skillerr.com`  
-   - Enforce HTTPS after DNS propagates
+1. **dot-skill/skillerr** → Settings → Pages  
+   - Source: **GitHub Actions** (already enabled)
+2. Settings → Pages → Custom domain: `skillerr.com` (already set)  
+   - Enforce HTTPS after DNS propagates and the cert is ready
 
-Workflow: `.github/workflows/pages.yml` (runs on push to `main` when `website/**` changes).
+Workflow: `.github/workflows/pages.yml` (runs on push to `main` when `website/**` changes). Latest deploy is green.
 
 ## DNS (registrar)
 
@@ -37,7 +37,7 @@ Verify: `dig skillerr.com +short` should return the four A records.
 
 ```bash
 cd website
-npm ci
+npm install
 npm run build          # builds fixtures + static site
 npm run fixtures:test  # validate / inspect / dry-run
 npm run preview        # http://localhost:4173

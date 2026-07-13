@@ -33,7 +33,7 @@ export default withMermaid(
         { text: "Workflows", link: "/workflows" },
         {
           text: "GitHub",
-          link: "https://github.com/dot-skill/dot-skill",
+          link: "https://github.com/dot-skill/skillerr",
         },
       ],
       sidebar: [
@@ -71,7 +71,7 @@ export default withMermaid(
         },
       ],
       socialLinks: [
-        { icon: "github", link: "https://github.com/dot-skill/dot-skill" },
+        { icon: "github", link: "https://github.com/dot-skill/skillerr" },
       ],
       footer: {
         message: "Open .skill Protocol — Draft 0.5.0",
