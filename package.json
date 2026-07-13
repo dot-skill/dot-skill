@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "build": "npm run build -w @skillerr/protocol && npm run build -w @skillerr/core && npm run build -w @skillerr/runtime && npm run build -w @skillerr/registry && npm run build -w @skillerr/workspace && npm run build -w @skillerr/cli",
-    "test": "npm run build && npm run test -w @skillerr/cli",
+    "test": "npm run build && npm test --workspaces --if-present",
     "test:examples": "node scripts/test-examples.mjs",
     "pack:check": "npm pack --workspaces --dry-run",
     "pack:check:meta": "npm pack -w skillerr --dry-run",

@@ -33,6 +33,8 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.test.js",
+    "!dist/**/*.test.d.ts",
     "README.md",
     "LICENSE"
   ],
@@ -45,7 +47,8 @@
   "scripts": {
     "build": "rimraf dist && tsc",
     "prepack": "npm run build",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "test": "node --test dist/runtime.test.js"
   },
   "dependencies": {
     "@skillerr/core": "^0.6.0",

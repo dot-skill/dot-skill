@@ -39,13 +39,16 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.test.js",
+    "!dist/**/*.test.d.ts",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "rimraf dist && tsc -p tsconfig.json",
     "clean": "rimraf dist",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test": "node --test dist/workspace.test.js"
   },
   "dependencies": {
     "@skillerr/core": "^0.6.0",
