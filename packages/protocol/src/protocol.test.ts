@@ -9,6 +9,7 @@ import { isValidAgentHost, FORBIDDEN_AGENT_HOSTS } from "./source.js";
 import { assessSkillContract, scaffoldSkillContract, explainContractAssessment } from "./authoring.js";
 import { recipeToSkillSource } from "./recipe.js";
 import type { Recipe } from "./recipe.js";
+import { isValidHostPattern, isValidPathPattern } from "./grammar.js";
 
 test("isValidAgentHost: denylists human/cli/shell-style hosts, allows real agent hosts", () => {
   assert.equal(isValidAgentHost("cursor"), true);
@@ -111,4 +112,81 @@ test("recipeToSkillSource: maps a legacy recipe into a protocol-native SkillSour
   // The {{base_url}} placeholder must be detected so downstream compile
   // knows an input needs to be inferred.
   assert.equal(source.inputs_declared, "inferred");
+});
+
+test("PROTO-5: isValidHostPattern accepts exact hosts and *.suffix wildcards, rejects URLs/ports/embedded wildcards", () => {
+  assert.equal(isValidHostPattern("example.com"), true);
+  assert.equal(isValidHostPattern("api.example.com"), true);
+  assert.equal(isValidHostPattern("localhost"), true);
+  assert.equal(isValidHostPattern("*.example.com"), true);
+  assert.equal(isValidHostPattern("{{registry_host}}"), true);
+
+  assert.equal(isValidHostPattern("https://example.com"), false, "full URL");
+  assert.equal(isValidHostPattern("example.com:8080"), false, "port");
+  assert.equal(isValidHostPattern("*"), false, "bare wildcard");
+  assert.equal(isValidHostPattern("ex*.com"), false, "embedded wildcard");
+  assert.equal(isValidHostPattern("*.evil.com/*"), false, "wildcard with path");
+  assert.equal(isValidHostPattern(""), false);
+  assert.equal(isValidHostPattern(undefined), false);
+});
+
+test("PROTO-5: isValidPathPattern accepts absolute normalized paths, rejects traversal/relative/backslashes", () => {
+  assert.equal(isValidPathPattern("/data"), true);
+  assert.equal(isValidPathPattern("/data/"), true);
+  assert.equal(isValidPathPattern("/home/user/project"), true);
+  assert.equal(isValidPathPattern("/"), true);
+  assert.equal(isValidPathPattern("{{workspace_root}}"), true);
+
+  assert.equal(isValidPathPattern("data"), false, "relative");
+  assert.equal(isValidPathPattern("../etc/passwd"), false, "traversal");
+  assert.equal(isValidPathPattern("/data/../etc"), false, "embedded traversal");
+  assert.equal(isValidPathPattern("C:\\evil"), false, "backslashes");
+  assert.equal(isValidPathPattern("/data//sub"), false, "empty segment");
+  assert.equal(isValidPathPattern("/data/./sub"), false, "dot segment");
+  assert.equal(isValidPathPattern(""), false);
+});
+
+test("PROTO-5: assessSkillContract rejects a malformed host/path permission pattern", () => {
+  const contract = {
+    kind: "skill_contract",
+    contract_version: "0.5",
+    skill_kind: "integration",
+    title: "x",
+    intent: "x",
+    sensitivity: "private",
+    triggers: { status: "none", reason: "none" },
+    inputs: { status: "none", reason: "none" },
+    preconditions: { status: "none", reason: "none" },
+    steps: { status: "none", reason: "none" },
+    branches: { status: "none", reason: "none" },
+    human_decisions: { status: "none", reason: "none" },
+    capabilities: { status: "none", reason: "none" },
+    permissions: {
+      status: "specified",
+      items: [
+        {
+          id: "bad_net",
+          side_effect_class: "network",
+          description: "x",
+          hosts: ["https://evil.com/?q=example.com"],
+          consent: "none",
+        },
+      ],
+    },
+    forbidden_actions: { status: "none", reason: "none" },
+    outputs: { status: "none", reason: "none" },
+    recovery: { status: "none", reason: "none" },
+    verification: { status: "none", reason: "none" },
+    corrections: { status: "none", reason: "none" },
+    provenance: {
+      evidence: { status: "none", reason: "none" },
+      limitations: { status: "none", reason: "none" },
+      human_review: { status: "not_reviewed" },
+    },
+  };
+  const assessment = assessSkillContract(contract, "continuity");
+  assert.equal(assessment.complete, false);
+  assert.ok(
+    assessment.issues.some((i) => i.field === "permissions" && i.message.includes("invalid host pattern")),
+  );
 });

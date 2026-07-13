@@ -4,6 +4,8 @@ import {
   CONTAINER_VERSION,
   PROTOCOL_VERSION,
   WORKFLOW_DIALECT_VERSION,
+  isValidHostPattern,
+  isValidPathPattern,
 } from "@skillerr/protocol";
 import { packageDigestFromContent, sealedManifestDigest, sha256Digest } from "./hash.js";
 import { unpackSkill } from "./pack.js";
@@ -114,6 +116,32 @@ export function validateManifestShape(manifest: SkillManifest): ValidationIssue[
         message:
           "manifest.manifest_digest does not match the recomputed identity/permissions/policy/capabilities/content claims — the manifest may have been altered after packing",
       });
+    }
+  }
+  // PROTO-5: validate hosts/paths grammar at the manifest level too — a
+  // manifest can reach here via the legacy (non-contract) compile path, or
+  // via direct tampering, neither of which goes through
+  // assessSkillContract's authoring-time grammar check.
+  for (const permission of manifest.permissions ?? []) {
+    for (const host of permission.hosts ?? []) {
+      if (!isValidHostPattern(host)) {
+        issues.push({
+          severity: "error",
+          code: "invalid_host_pattern",
+          message: `permissions[].hosts contains an invalid host pattern: ${JSON.stringify(host)}`,
+          path: permission.description,
+        });
+      }
+    }
+    for (const path of permission.paths ?? []) {
+      if (!isValidPathPattern(path)) {
+        issues.push({
+          severity: "error",
+          code: "invalid_path_pattern",
+          message: `permissions[].paths contains an invalid path pattern: ${JSON.stringify(path)}`,
+          path: permission.description,
+        });
+      }
     }
   }
   if (manifest.compile_profile === "release") {

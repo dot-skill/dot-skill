@@ -7,6 +7,7 @@ import type {
   SkillContract,
 } from "./contract.js";
 import type { SkillCompileProfile } from "./types.js";
+import { isValidHostPattern, isValidPathPattern } from "./grammar.js";
 
 /**
  * Fields each step kind needs to compile into a real workflow step.
@@ -220,6 +221,44 @@ export function assessSkillContract(
     "description",
     "consent",
   ]);
+  // PROTO-5: hosts/paths are matched ad hoc by the runtime unless they're
+  // validated against a real grammar here first — this is what makes
+  // SEC-A/SEC-B's runtime fixes trustworthy rather than the only line of
+  // defense. A malformed pattern (a full URL, an embedded wildcard, a
+  // relative or ".."-containing path) is rejected at authoring time.
+  {
+    const permissionsDeclaration = contract.permissions as
+      | { status?: string; items?: import("./contract.js").ContractPermission[] }
+      | undefined;
+    if (
+      permissionsDeclaration?.status === "specified" &&
+      Array.isArray(permissionsDeclaration.items)
+    ) {
+      permissionsDeclaration.items.forEach((item, index) => {
+        if (!item || typeof item !== "object") return;
+        for (const host of item.hosts ?? []) {
+          if (!isValidHostPattern(host)) {
+            issues.push({
+              field: "permissions",
+              code: "invalid",
+              message: `permissions.items[${index}].hosts contains an invalid host pattern: ${JSON.stringify(host)}`,
+              fix: 'Use an exact hostname ("example.com") or a "*.example.com" suffix wildcard — never a URL, port, or embedded wildcard.',
+            });
+          }
+        }
+        for (const path of item.paths ?? []) {
+          if (!isValidPathPattern(path)) {
+            issues.push({
+              field: "permissions",
+              code: "invalid",
+              message: `permissions.items[${index}].paths contains an invalid path pattern: ${JSON.stringify(path)}`,
+              fix: 'Use an absolute, normalized path ("/data") — no "..", no backslashes, no relative segments.',
+            });
+          }
+        }
+      });
+    }
+  }
   validateItems("forbidden_actions", contract.forbidden_actions, [
     "id",
     "description",

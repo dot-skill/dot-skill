@@ -88,6 +88,36 @@ example.skill
 └── signatures/          # attestation + optional anchors
 ```
 
+## Permission grammar (PROTO-5)
+
+`permission.hosts` and `permission.paths` are not bare ad hoc strings —
+they're validated against a specific grammar (`@skillerr/protocol`'s
+`isValidHostPattern` / `isValidPathPattern`), at both contract-authoring
+time (`assessSkillContract`) and manifest-validation time
+(`skill validate`), so a malformed declaration is refused before it ever
+reaches a runtime. This is the root-cause fix behind SEC-A (host
+substring/prefix bypass) and SEC-B (path traversal past a filesystem root)
+staying fixed: runtimes match against pre-validated patterns instead of
+each having to re-derive "is this well-formed" independently.
+
+- **Hosts**: an exact hostname (`example.com`), or a `*.` suffix wildcard
+  (`*.example.com`) matching any subdomain — `*` only ever as a whole
+  leading label, never embedded (`ex*.com` is invalid), never a bare `*`.
+  Never a full URL, port, or IP/CIDR.
+- **Paths**: an absolute, forward-slash path with normalized segments
+  (`/data`, `/home/user/project`) — no backslashes, no `.`/`..` segments,
+  no empty segments, not relative. Declaring a path grants everything
+  rooted under it (matches the runtime's prefix-based matching); there is
+  no separate glob syntax because the runtime doesn't implement one.
+- **Placeholders**: a whole-string `{{input_name}}` referencing a declared
+  input (the same convention used for input references in section/prompt
+  bodies) is grammar-valid for both hosts and paths — see the
+  `scoped-npm-monorepo-publishing` gold example's
+  `paths: ["{{workspace_root}}"]`. **Known gap:** the reference runtime
+  does not yet resolve these against the input's runtime value before
+  matching, so a placeholder permission cannot currently match anything.
+  Grammar-valid, not yet functional — tracked in [ROADMAP.md](./ROADMAP.md).
+
 ## Integrity & trust
 
 - Canonical JSON for the package index: **RFC 8785 (JCS)** — see

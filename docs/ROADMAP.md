@@ -19,9 +19,16 @@ Status: protocol **Draft 0.5.0**; reference packages **0.6.0**.
 - [x] Adversarial package corpus (zip bombs, path tricks, hash mismatch,
       duplicate entries, tampered digests, stripped issuer_class) —
       `packages/cli/src/adversarial.test.ts`, run on every `npm test`
+- [x] Structured permission grammar for `permission.hosts`/`.paths`
+      (`@skillerr/protocol`'s `isValidHostPattern`/`isValidPathPattern`),
+      validated at both contract-authoring and manifest-validation time
 
 ## Next (great contribution targets)
 
+- [ ] Resolve `{{input_name}}` permission-path/host placeholders against
+      the input's runtime value before matching in
+      `assertCapabilityAllowed` — grammar-valid today (PROTO-5) but not yet
+      functional; see the `scoped-npm-monorepo-publishing` gold example
 - [ ] Validate the published authoring schema with an independent implementation
 - [ ] Production-grade signing (replace dev HMAC; document key ceremony)
 - [ ] HTTP transparency-log server (same log format as local registry)

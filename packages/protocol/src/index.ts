@@ -88,6 +88,8 @@ export {
   explainContractAssessment,
 } from "./authoring.js";
 
+export { isValidHostPattern, isValidPathPattern } from "./grammar.js";
+
 export {
   extractSkillCandidates,
   segmentJourney,
