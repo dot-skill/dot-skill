@@ -1,6 +1,6 @@
 {
-  "name": "@dot-skill/core",
-  "version": "0.5.0",
+  "name": "@skillerr/core",
+  "version": "0.6.0",
   "description": "Compile, pack, validate, and mint portable .skill packages",
   "license": "MIT",
   "author": {
@@ -9,7 +9,6 @@
   },
   "keywords": [
     "skill",
-    "dot-skill",
     ".skill",
     "ai-agents",
     "agent-skills",
@@ -24,12 +23,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dot-skill/dot-skill.git",
+    "url": "https://github.com/skillerr/skillerr.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "homepage": "https://skillerr.com",
   "bugs": {
-    "url": "https://github.com/dot-skill/dot-skill/issues"
+    "url": "https://github.com/skillerr/skillerr/issues"
   },
   "files": [
     "dist",
@@ -48,7 +47,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dot-skill/protocol": "^0.5.0",
+    "@skillerr/protocol": "^0.6.0",
     "fflate": "^0.8.2"
   },
   "devDependencies": {

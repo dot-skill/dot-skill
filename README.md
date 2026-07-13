@@ -125,15 +125,15 @@ See [docs/SECURITY.md](./docs/SECURITY.md).
 
 ## Packages
 
-| Package / path | Purpose |
-|----------------|---------|
-| [`skillerr`](./packages/skillerr) | **Reference CLI** — bin `skill` |
-| [`packages/cli`](./packages/cli) | CLI implementation |
-| [`packages/protocol`](./packages/protocol) | SkillContract, SkillSource, types |
-| [`packages/core`](./packages/core) | Compile, pack, validate, mint |
-| [`packages/runtime`](./packages/runtime) | Inspect / dry-run / execute |
-| [`packages/workspace`](./packages/workspace) | Local `.skill/` working tree |
-| [`packages/registry`](./packages/registry) | Optional local transparency log |
+| Package | Purpose |
+|---------|---------|
+| [`skillerr`](./packages/skillerr) | **Reference CLI** — bins `skill` / `skillerr` |
+| [`@skillerr/cli`](./packages/cli) | CLI implementation |
+| [`@skillerr/protocol`](./packages/protocol) | SkillContract, SkillSource, types |
+| [`@skillerr/core`](./packages/core) | Compile, pack, validate, mint |
+| [`@skillerr/runtime`](./packages/runtime) | Inspect / dry-run / execute |
+| [`@skillerr/workspace`](./packages/workspace) | Local `.skill/` working tree |
+| [`@skillerr/registry`](./packages/registry) | Optional local transparency log |
 
 From this repository root:
 

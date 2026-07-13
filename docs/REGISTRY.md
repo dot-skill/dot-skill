@@ -1,6 +1,6 @@
 # Optional local registry
 
-`@dot-skill/registry` appends to `~/.dot-skill/registry/log.jsonl` by default.
+`@skillerr/registry` appends to `~/.skillerr/registry/log.jsonl` by default.
 
 It is an optional local transparency log and is not part of the default create path.
 

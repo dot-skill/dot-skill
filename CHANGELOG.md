@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 — 2026-07-13
+
+- Renamed npm scope from `@dot-skill/*` to `@skillerr/*` (protocol, core, runtime, registry, workspace, cli).
+- Public install remains `npm i -g skillerr` (bins: `skill`, `skillerr`).
+- Homepage and docs point to [skillerr.com](https://skillerr.com); repository URLs use `skillerr/skillerr`.
+- Local registry default path is `~/.skillerr/registry/log.jsonl` (reads legacy `~/.dot-skill/…` if present).
+- Preserved `.skill` artifact extension and wire identifiers (`kind: "dot-skill"`, `application/vnd.dot-skill+zip`).
+
 ## 0.5.0 — 2026-07-13
 
 - Added the product-neutral `SkillContract` as the release compilation source of truth.
@@ -13,7 +21,7 @@
   human-decision callbacks that cannot be spoofed with input values.
 - Added approved npm-publishing gold-model conformance coverage.
 - Added per-package READMEs and included them in npm tarballs.
-- Public install package is `skillerr` (depends on `@dot-skill/cli`, exposes `skill` / `dot-skill` bins).
+- Public install package is `skillerr` (depends on `@skillerr/cli`, exposes the `skill` bin).
 - Hardened public docs and CLI help for create vs ingest paths.
 - Added agent multi-skill identify path: `skill agent-guide`, `skill extract` / `skill segment`,
   protocol `extractSkillCandidates` / `agentCreateGuide`, and incomplete SkillContract scaffolds

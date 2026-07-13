@@ -12,7 +12,7 @@ npm i -g skillerr
 npx -y skillerr --help
 ```
 
-Bin: `skill` (also `dot-skill` → same entry).
+Bin: `skill`.
 
 ## Rules
 

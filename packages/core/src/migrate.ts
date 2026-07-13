@@ -1,11 +1,11 @@
-import type { Skill } from "@dot-skill/protocol";
+import type { Skill } from "@skillerr/protocol";
 import {
   DEFAULT_SKILL_POLICY,
   CONTAINER_VERSION,
   PROTOCOL_VERSION,
   WORKFLOW_DIALECT_VERSION,
   type SkillPackageFiles,
-} from "@dot-skill/protocol";
+} from "@skillerr/protocol";
 import { packSkill } from "./pack.js";
 import { randomUUID } from "node:crypto";
 

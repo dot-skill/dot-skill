@@ -8,12 +8,12 @@ import type {
   TrustProfile,
   TrustState,
   TrustView,
-} from "@dot-skill/protocol";
+} from "@skillerr/protocol";
 import {
   detectAgentRuntimeMarkers,
   hasAgentRuntimeEvidence,
   isValidAgentHost,
-} from "@dot-skill/protocol";
+} from "@skillerr/protocol";
 import {
   canonicalize,
   PUBLIC_DEV_MINT_KEY,
@@ -74,7 +74,7 @@ function loadCoreIdentity(): { name: string; version: string } {
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
   ) as { name?: unknown; version?: unknown };
   if (typeof metadata.name !== "string" || typeof metadata.version !== "string") {
-    throw new Error("Invalid @dot-skill/core package metadata");
+    throw new Error("Invalid @skillerr/core package metadata");
   }
   return { name: metadata.name, version: metadata.version };
 }

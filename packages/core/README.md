@@ -1,13 +1,13 @@
-# `@dot-skill/core`
+# `@skillerr/core`
 
-Compile, pack, validate, and mint `.skill` packages for the [Open `.skill` Protocol](https://github.com/dot-skill/dot-skill).
+Compile, pack, validate, and mint `.skill` packages for the [Open `.skill` Protocol](https://github.com/skillerr/skillerr).
 
 Turns a **SkillSource** / **SkillContract** into a deterministic ZIP with digests, privacy scrubbing, completeness gates, and optional mint attestation.
 
 ## Install
 
 ```bash
-npm i @dot-skill/core
+npm i @skillerr/core
 ```
 
 ## Capabilities
@@ -27,11 +27,11 @@ npm i @dot-skill/core
 
 ## Related
 
-- [`@dot-skill/protocol`](https://www.npmjs.com/package/@dot-skill/protocol) — types & contract
-- [`@dot-skill/runtime`](https://www.npmjs.com/package/@dot-skill/runtime) — inspect / dry-run / execute
+- [`@skillerr/protocol`](https://www.npmjs.com/package/@skillerr/protocol) — types & contract
+- [`@skillerr/runtime`](https://www.npmjs.com/package/@skillerr/runtime) — inspect / dry-run / execute
 - [`skillerr`](https://www.npmjs.com/package/skillerr) — public install (`skill` CLI)
 
-Docs: [PROTOCOL.md](https://github.com/dot-skill/dot-skill/blob/main/docs/PROTOCOL.md) · [MINT.md](https://github.com/dot-skill/dot-skill/blob/main/docs/MINT.md)
+Docs: [PROTOCOL.md](https://github.com/skillerr/skillerr/blob/main/docs/PROTOCOL.md) · [MINT.md](https://github.com/skillerr/skillerr/blob/main/docs/MINT.md)
 
 ## License
 

@@ -1,4 +1,4 @@
-/** @dot-skill/core — pack, unpack, validate, mint, compile .skill packages. */
+/** @skillerr/core — pack, unpack, validate, mint, compile .skill packages. */
 
 export {
   canonicalize,

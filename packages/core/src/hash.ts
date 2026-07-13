@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { SealedManifestClaims, SkillManifest } from "@dot-skill/protocol";
+import type { SealedManifestClaims, SkillManifest } from "@skillerr/protocol";
 
 /** RFC 8785-inspired JSON Canonicalization for I-JSON-compatible objects. */
 export function canonicalize(value: unknown): string {

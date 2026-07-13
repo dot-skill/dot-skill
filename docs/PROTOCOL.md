@@ -53,7 +53,7 @@ checkpoint or release compile. See [AGENT.md](./AGENT.md).
 ## Agent provenance
 
 Reference creation paths require an agent host declaration (CLI with
-`SKILL_HOST`, an IDE extension, or an app wrapping `@dot-skill/core`). Local
+`SKILL_HOST`, an IDE extension, or an app wrapping `@skillerr/core`). Local
 and offline model hosts are supported. Hosts in the denylist (`human`, `cli`,
 `shell`, `manual`, …) cannot mint. `SKILL_HOST` alone is **self_reported**
 provenance and never `verified_issuer` trust. Public-dev HMAC seals are

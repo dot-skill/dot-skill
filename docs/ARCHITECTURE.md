@@ -14,7 +14,7 @@
                 │                             │
                 ▼                             ▼
 ┌───────────────────────────┐   ┌─────────────────────────────┐
-│  @dot-skill/runtime       │   │  @dot-skill/registry        │
+│  @skillerr/runtime       │   │  @skillerr/registry        │
 │  inspect / dry-run / run  │   │  free transparency log      │
 │  → SkillRun               │   │  → PermanenceAnchor         │
 └───────────────────────────┘   └─────────────────────────────┘

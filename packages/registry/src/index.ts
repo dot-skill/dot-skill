@@ -1,7 +1,7 @@
 /**
- * @dot-skill/registry — free append-only transparency log for `.skill` packages.
+ * @skillerr/registry — free append-only transparency log for `.skill` packages.
  *
- * Default log path: ~/.dot-skill/registry/log.jsonl
+ * Default log path: ~/.skillerr/registry/log.jsonl
  * Each line is a JSON object with a publish record.
  * Lookup and verify confirm a package_digest is anchored in the log.
  */
@@ -10,8 +10,8 @@ import { appendFile, readFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import type { PermanenceAnchor } from "@dot-skill/protocol";
-import { unpackSkill } from "@dot-skill/core";
+import type { PermanenceAnchor } from "@skillerr/protocol";
+import { unpackSkill } from "@skillerr/core";
 
 export interface RegistryEntry {
   kind: "registry_entry";
@@ -40,7 +40,10 @@ export interface RegistryVerifyResult {
 }
 
 function defaultLogPath(): string {
-  return join(homedir(), ".dot-skill", "registry", "log.jsonl");
+  const preferred = join(homedir(), ".skillerr", "registry", "log.jsonl");
+  const legacy = join(homedir(), ".dot-skill", "registry", "log.jsonl");
+  if (!existsSync(preferred) && existsSync(legacy)) return legacy;
+  return preferred;
 }
 
 async function ensureDir(filePath: string): Promise<void> {
@@ -156,7 +159,7 @@ export async function verify(
 
 /**
  * Build a PermanenceAnchor pointing to the local transparency log.
- * Use with addPermanenceAnchor from @dot-skill/core to embed the anchor in the package.
+ * Use with addPermanenceAnchor from @skillerr/core to embed the anchor in the package.
  */
 export function buildTransparencyLogAnchor(
   digest: string,
@@ -166,6 +169,6 @@ export function buildTransparencyLogAnchor(
     kind: "transparency_log",
     located_at: `file://${logPath ?? defaultLogPath()}`,
     anchored_at: new Date().toISOString(),
-    issuer: "@dot-skill/registry",
+    issuer: "@skillerr/registry",
   };
 }

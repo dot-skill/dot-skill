@@ -73,7 +73,7 @@ skill contract-template
 skill contract-check contract.json --profile release
 ```
 
-The published JSON Schema is exported as `@dot-skill/protocol/skill-contract.schema.json`.
+The published JSON Schema is exported as `@skillerr/protocol/skill-contract.schema.json`.
 
 ## Candidate extraction
 

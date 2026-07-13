@@ -32,10 +32,10 @@ import {
   approveCompilation,
   redactSecrets,
   CompileRefusalError,
-} from "@dot-skill/core";
-import { runSkillArchive } from "@dot-skill/runtime";
-import { lookup, list, verify as registryVerify, publish as registryPublish } from "@dot-skill/registry";
-import type { Recipe, SectionType, Skill, SkillSource } from "@dot-skill/protocol";
+} from "@skillerr/core";
+import { runSkillArchive } from "@skillerr/runtime";
+import { lookup, list, verify as registryVerify, publish as registryPublish } from "@skillerr/registry";
+import type { Recipe, SectionType, Skill, SkillSource } from "@skillerr/protocol";
 import {
   agentCreateGuide,
   assessSkillContract,
@@ -44,7 +44,7 @@ import {
   formatAgentGuide,
   isValidAgentHost,
   scaffoldSkillContract,
-} from "@dot-skill/protocol";
+} from "@skillerr/protocol";
 import {
   initWorkspace,
   requireWorkspace,
@@ -60,14 +60,14 @@ import {
   loadSkillHandoff,
   setJourney,
   requireAgentHost,
-} from "@dot-skill/workspace";
+} from "@skillerr/workspace";
 
 function loadPackageVersion(): string {
   const metadata = JSON.parse(
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
   ) as { version?: unknown };
   if (typeof metadata.version !== "string" || metadata.version.length === 0) {
-    throw new Error("Invalid @dot-skill/cli package version metadata");
+    throw new Error("Invalid @skillerr/cli package version metadata");
   }
   return metadata.version;
 }
@@ -125,7 +125,7 @@ Notes:
   development-only. human/cli/shell/manual hosts are denylisted for mint.
 
 Install:  npm i -g skillerr   →  skill --help
-Docs:     https://github.com/dot-skill/dot-skill
+Docs:     https://skillerr.com
 `);
   process.exit(exitCode);
 }
@@ -453,7 +453,7 @@ async function main() {
           mint: flag(rest, "--mint"),
           profile,
           host: opt(rest, "--host"),
-          agent_runtime: process.env.SKILL_AGENT_RUNTIME ?? "@dot-skill/cli",
+          agent_runtime: process.env.SKILL_AGENT_RUNTIME ?? "@skillerr/cli",
           agent_version:
             process.env.SKILL_AGENT_VERSION ??
             (process.env.SKILL_AGENT_RUNTIME ? "unknown" : VERSION),
@@ -548,7 +548,7 @@ async function main() {
         endpoint: process.env.SKILL_ENDPOINT
           ? redactSecrets(process.env.SKILL_ENDPOINT)
           : undefined,
-        agent_runtime: process.env.SKILL_AGENT_RUNTIME ?? "@dot-skill/cli",
+        agent_runtime: process.env.SKILL_AGENT_RUNTIME ?? "@skillerr/cli",
         agent_version:
           process.env.SKILL_AGENT_VERSION ??
           (process.env.SKILL_AGENT_RUNTIME ? "unknown" : VERSION),

@@ -1,10 +1,10 @@
-import type { SkillManifest, Workflow } from "@dot-skill/protocol";
+import type { SkillManifest, Workflow } from "@skillerr/protocol";
 import {
   assessSkillContract,
   CONTAINER_VERSION,
   PROTOCOL_VERSION,
   WORKFLOW_DIALECT_VERSION,
-} from "@dot-skill/protocol";
+} from "@skillerr/protocol";
 import { packageDigestFromContent, sha256Digest } from "./hash.js";
 import { unpackSkill } from "./pack.js";
 

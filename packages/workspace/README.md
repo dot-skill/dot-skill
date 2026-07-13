@@ -1,4 +1,4 @@
-# `@dot-skill/workspace`
+# `@skillerr/workspace`
 
 Local working tree for authoring `.skill` packages — sections, stage, compile, checkpoint, and mint.
 
@@ -7,7 +7,7 @@ Git-like layout under `.skill/`. Agents propose sections; humans stage and appro
 ## Install
 
 ```bash
-npm i @dot-skill/workspace
+npm i @skillerr/workspace
 ```
 
 Typically used via [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill init`, `propose`, `checkpoint`, `compile`, `load`).
@@ -35,10 +35,10 @@ Typically used via [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill 
 
 ## Related
 
-- [`@dot-skill/core`](https://www.npmjs.com/package/@dot-skill/core) — compile / mint
+- [`@skillerr/core`](https://www.npmjs.com/package/@skillerr/core) — compile / mint
 - [`skillerr`](https://www.npmjs.com/package/skillerr) — public install / user-facing CLI
 
-Docs: [WORKSPACE.md](https://github.com/dot-skill/dot-skill/blob/main/docs/WORKSPACE.md) · [CONTINUITY.md](https://github.com/dot-skill/dot-skill/blob/main/docs/CONTINUITY.md)
+Docs: [WORKSPACE.md](https://github.com/skillerr/skillerr/blob/main/docs/WORKSPACE.md) · [CONTINUITY.md](https://github.com/skillerr/skillerr/blob/main/docs/CONTINUITY.md)
 
 ## License
 

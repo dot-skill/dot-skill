@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dot-skill.org/schema/0.5/skill-contract.schema.json",
+  "$id": "https://skillerr.com/schema/0.5/skill-contract.schema.json",
   "title": "Open .skill 0.5 authoring contract",
   "type": "object",
   "additionalProperties": false,

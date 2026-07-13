@@ -5,7 +5,7 @@ import type {
   SkillPackageFiles,
   Workflow,
   CompilationReport,
-} from "@dot-skill/protocol";
+} from "@skillerr/protocol";
 import { packageDigestFromContent, sha256Digest } from "./hash.js";
 import {
   assertSafePaths,
@@ -191,16 +191,16 @@ export function unpackSkill(archive: Uint8Array): UnpackResult {
   }
 
   const creation = signatures["creation.dsse.json"] as
-    | { attestation?: import("@dot-skill/protocol").CreationAttestation }
+    | { attestation?: import("@skillerr/protocol").CreationAttestation }
     | undefined;
   const attestation =
     creation?.attestation ??
     (signatures["creation.attestation.json"] as
-      | import("@dot-skill/protocol").CreationAttestation
+      | import("@skillerr/protocol").CreationAttestation
       | undefined);
   const anchorsFromSig = Object.entries(signatures)
     .filter(([k]) => k.startsWith("anchors/"))
-    .map(([, v]) => v as import("@dot-skill/protocol").PermanenceAnchor);
+    .map(([, v]) => v as import("@skillerr/protocol").PermanenceAnchor);
 
   const raw: SkillPackageFiles = {
     manifest,

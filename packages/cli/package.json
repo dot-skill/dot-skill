@@ -1,6 +1,6 @@
 {
-  "name": "@dot-skill/cli",
-  "version": "0.5.0",
+  "name": "@skillerr/cli",
+  "version": "0.6.0",
   "description": "CLI implementation for portable .skill packages (install skillerr for the skill bin)",
   "license": "MIT",
   "author": {
@@ -10,7 +10,6 @@
   "keywords": [
     "skill",
     "skillerr",
-    "dot-skill",
     ".skill",
     "ai-agents",
     "agent-skills",
@@ -20,7 +19,7 @@
   "type": "module",
   "bin": {
     "skill": "./dist/cli.js",
-    "dot-skill": "./dist/cli.js"
+    "skillerr": "./dist/cli.js"
   },
   "main": "./dist/cli.js",
   "publishConfig": {
@@ -28,12 +27,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dot-skill/dot-skill.git",
+    "url": "https://github.com/skillerr/skillerr.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "homepage": "https://skillerr.com",
   "bugs": {
-    "url": "https://github.com/dot-skill/dot-skill/issues"
+    "url": "https://github.com/skillerr/skillerr/issues"
   },
   "files": [
     "dist/cli.js",
@@ -47,11 +46,11 @@
     "test": "node --test dist/conformance.test.js"
   },
   "dependencies": {
-    "@dot-skill/core": "^0.5.0",
-    "@dot-skill/protocol": "^0.5.0",
-    "@dot-skill/registry": "^0.5.0",
-    "@dot-skill/runtime": "^0.5.0",
-    "@dot-skill/workspace": "^0.5.0"
+    "@skillerr/core": "^0.6.0",
+    "@skillerr/protocol": "^0.6.0",
+    "@skillerr/registry": "^0.6.0",
+    "@skillerr/runtime": "^0.6.0",
+    "@skillerr/workspace": "^0.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

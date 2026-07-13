@@ -12,7 +12,7 @@ import type {
   SkillStepRecord,
   TrustProfile,
   WorkflowStep,
-} from "@dot-skill/protocol";
+} from "@skillerr/protocol";
 import {
   inspectSkill,
   inspectTrustView,
@@ -20,7 +20,7 @@ import {
   validatePackageBytes,
   verifyMintTrust,
   sha256Digest,
-} from "@dot-skill/core";
+} from "@skillerr/core";
 
 export interface CapabilityAdapter {
   name: string;
@@ -79,7 +79,7 @@ function loadRuntimeIdentity(): { name: string; version: string } {
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
   ) as { name?: unknown; version?: unknown };
   if (typeof metadata.name !== "string" || typeof metadata.version !== "string") {
-    throw new Error("Invalid @dot-skill/runtime package metadata");
+    throw new Error("Invalid @skillerr/runtime package metadata");
   }
   return { name: metadata.name, version: metadata.version };
 }

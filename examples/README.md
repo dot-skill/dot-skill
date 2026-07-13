@@ -17,5 +17,5 @@ Multi-skill identify path:
 
 ```bash
 node packages/cli/dist/cli.js agent-guide
-node packages/cli/dist/cli.js extract examples/multi-skill-extract/journey.json -o /tmp/dot-skill-extract
+node packages/cli/dist/cli.js extract examples/multi-skill-extract/journey.json -o /tmp/skillerr-extract
 ```

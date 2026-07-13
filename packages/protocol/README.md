@@ -1,13 +1,13 @@
-# `@dot-skill/protocol`
+# `@skillerr/protocol`
 
-Types, schemas, and completeness rules for the [Open `.skill` Protocol](https://github.com/dot-skill/dot-skill).
+Types, schemas, and completeness rules for the [Open `.skill` Protocol](https://github.com/skillerr/skillerr).
 
 Defines **SkillContract**, **SkillSource**, section shapes, assessment helpers, and the JSON Schema used for transferable authoring. This package is the semantic source of truth; it does not pack or run skills.
 
 ## Install
 
 ```bash
-npm i @dot-skill/protocol
+npm i @skillerr/protocol
 ```
 
 ## What you get
@@ -26,10 +26,10 @@ Product-specific capture words map into this model via adapters; they are not pr
 
 ## Related
 
-- [`@dot-skill/core`](https://www.npmjs.com/package/@dot-skill/core) — compile / pack / mint
+- [`@skillerr/core`](https://www.npmjs.com/package/@skillerr/core) — compile / pack / mint
 - [`skillerr`](https://www.npmjs.com/package/skillerr) — public install (`skill` CLI)
 
-Docs: [PROTOCOL.md](https://github.com/dot-skill/dot-skill/blob/main/docs/PROTOCOL.md) · [AUTHORING-CONTRACT.md](https://github.com/dot-skill/dot-skill/blob/main/docs/AUTHORING-CONTRACT.md)
+Docs: [PROTOCOL.md](https://github.com/skillerr/skillerr/blob/main/docs/PROTOCOL.md) · [AUTHORING-CONTRACT.md](https://github.com/skillerr/skillerr/blob/main/docs/AUTHORING-CONTRACT.md)
 
 ## License
 

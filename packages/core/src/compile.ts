@@ -18,7 +18,7 @@ import type {
   SkillSource,
   SteeringConstraint,
   WorkflowStep,
-} from "@dot-skill/protocol";
+} from "@skillerr/protocol";
 import {
   DEFAULT_SKILL_POLICY,
   CONTAINER_VERSION,
@@ -27,7 +27,7 @@ import {
   assessSkillContract,
   isValidAgentHost,
   recipeToSkillSource,
-} from "@dot-skill/protocol";
+} from "@skillerr/protocol";
 import { packSkill, finalizeManifest, buildFileMap } from "./pack.js";
 
 const PLACEHOLDER_RE =

@@ -1,6 +1,6 @@
 {
-  "name": "@dot-skill/workspace",
-  "version": "0.5.0",
+  "name": "@skillerr/workspace",
+  "version": "0.6.0",
   "description": "Local workspace for sections, stage, compile, checkpoint, and mint",
   "license": "MIT",
   "author": {
@@ -9,7 +9,6 @@
   },
   "keywords": [
     "skill",
-    "dot-skill",
     ".skill",
     "ai-agents",
     "agent-skills",
@@ -24,12 +23,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dot-skill/dot-skill.git",
+    "url": "https://github.com/skillerr/skillerr.git",
     "directory": "packages/workspace"
   },
-  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "homepage": "https://skillerr.com",
   "bugs": {
-    "url": "https://github.com/dot-skill/dot-skill/issues"
+    "url": "https://github.com/skillerr/skillerr/issues"
   },
   "exports": {
     ".": {
@@ -47,8 +46,8 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@dot-skill/core": "^0.5.0",
-    "@dot-skill/protocol": "^0.5.0"
+    "@skillerr/core": "^0.6.0",
+    "@skillerr/protocol": "^0.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

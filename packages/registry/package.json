@@ -1,6 +1,6 @@
 {
-  "name": "@dot-skill/registry",
-  "version": "0.5.0",
+  "name": "@skillerr/registry",
+  "version": "0.6.0",
   "description": "Optional local transparency log for .skill package digests",
   "license": "MIT",
   "author": {
@@ -9,7 +9,6 @@
   },
   "keywords": [
     "skill",
-    "dot-skill",
     ".skill",
     "ai-agents",
     "transparency-log",
@@ -23,12 +22,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dot-skill/dot-skill.git",
+    "url": "https://github.com/skillerr/skillerr.git",
     "directory": "packages/registry"
   },
-  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "homepage": "https://skillerr.com",
   "bugs": {
-    "url": "https://github.com/dot-skill/dot-skill/issues"
+    "url": "https://github.com/skillerr/skillerr/issues"
   },
   "files": [
     "dist",
@@ -47,8 +46,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dot-skill/core": "^0.5.0",
-    "@dot-skill/protocol": "^0.5.0"
+    "@skillerr/core": "^0.6.0",
+    "@skillerr/protocol": "^0.6.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

@@ -1,6 +1,6 @@
-# `@dot-skill/cli`
+# `@skillerr/cli`
 
-CLI implementation for the [Open `.skill` Protocol](https://github.com/dot-skill/dot-skill).
+CLI implementation for the [Open `.skill` Protocol](https://github.com/skillerr/skillerr).
 
 **Public install:** [`skillerr`](https://www.npmjs.com/package/skillerr) · **Bin:** `skill`
 
@@ -53,12 +53,12 @@ skill --help
 ## Related
 
 - [`skillerr`](https://www.npmjs.com/package/skillerr) — public install
-- [`@dot-skill/protocol`](https://www.npmjs.com/package/@dot-skill/protocol)
-- [`@dot-skill/core`](https://www.npmjs.com/package/@dot-skill/core)
-- [`@dot-skill/runtime`](https://www.npmjs.com/package/@dot-skill/runtime)
-- [`@dot-skill/workspace`](https://www.npmjs.com/package/@dot-skill/workspace)
+- [`@skillerr/protocol`](https://www.npmjs.com/package/@skillerr/protocol)
+- [`@skillerr/core`](https://www.npmjs.com/package/@skillerr/core)
+- [`@skillerr/runtime`](https://www.npmjs.com/package/@skillerr/runtime)
+- [`@skillerr/workspace`](https://www.npmjs.com/package/@skillerr/workspace)
 
-Docs: [Agent](https://github.com/dot-skill/dot-skill/blob/main/docs/AGENT.md) · [Protocol](https://github.com/dot-skill/dot-skill/blob/main/docs/PROTOCOL.md)
+Docs: [Agent](https://github.com/skillerr/skillerr/blob/main/docs/AGENT.md) · [Protocol](https://github.com/skillerr/skillerr/blob/main/docs/PROTOCOL.md)
 
 ## License
 

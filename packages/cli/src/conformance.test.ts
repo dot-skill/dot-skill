@@ -19,7 +19,7 @@ import {
   compileSkillSource,
   approveCompilation,
   CompileRefusalError,
-} from "@dot-skill/core";
+} from "@skillerr/core";
 import {
   DEFAULT_SKILL_POLICY,
   CONTAINER_VERSION,
@@ -32,9 +32,9 @@ import {
   type SkillContract,
   type SkillPackageFiles,
   type SkillSource,
-} from "@dot-skill/protocol";
-import { assertCapabilityAllowed, runSkillArchive, runSkillPackage } from "@dot-skill/runtime";
-import { publish, lookup, list } from "@dot-skill/registry";
+} from "@skillerr/protocol";
+import { assertCapabilityAllowed, runSkillArchive, runSkillPackage } from "@skillerr/runtime";
+import { publish, lookup, list } from "@skillerr/registry";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -481,7 +481,7 @@ test("CLI agent-guide and extract emit multi-skill scaffolds with incompleteness
   const journeyPath = fileURLToPath(
     new URL("../../../examples/multi-skill-extract/journey.json", import.meta.url),
   );
-  const outDir = join(tmpdir(), `dot-skill-extract-${Date.now()}`);
+  const outDir = join(tmpdir(), `skillerr-extract-${Date.now()}`);
   let extractOut = "";
   let exitCode = 0;
   try {
@@ -1025,7 +1025,7 @@ test("journey and endpoint provenance are scrubbed", () => {
 });
 
 test("registry local log publish and lookup", async () => {
-  const logPath = join(tmpdir(), `dot-skill-test-${Date.now()}.jsonl`);
+  const logPath = join(tmpdir(), `skillerr-test-${Date.now()}.jsonl`);
   const digest = "sha256:" + "c".repeat(64);
   const result = await publish(digest, { title: "test" }, logPath);
   assert.equal(result.ok, true);
@@ -1065,7 +1065,7 @@ test("workspace legacy sections checkpoint for continuity but refuse release", a
       status,
       setJourney,
       loadSkillHandoff,
-    } = await import("@dot-skill/workspace");
+    } = await import("@skillerr/workspace");
     await initWorkspace(dir, { title: "WS" });
     await setJourney(dir, {
       summary: "Building auth flow with agent; tokens as secret refs only.",
@@ -1117,7 +1117,7 @@ test("propose without agent provenance is rejected", async () => {
   const prevHost = process.env.SKILL_HOST;
   delete process.env.SKILL_HOST;
   try {
-    const { initWorkspace, proposeSection } = await import("@dot-skill/workspace");
+    const { initWorkspace, proposeSection } = await import("@skillerr/workspace");
     await initWorkspace(dir, { title: "Nope" });
     await assert.rejects(
       () => proposeSection(dir, { title: "x", body: "y" }),

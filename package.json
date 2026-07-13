@@ -1,6 +1,6 @@
 {
-  "name": "dot-skill-monorepo",
-  "version": "0.5.0",
+  "name": "skillerr-monorepo",
+  "version": "0.6.0",
   "private": true,
   "description": "Easily create, inspect, and run portable .skill packages for AI agents",
   "license": "MIT",
@@ -11,7 +11,6 @@
   "keywords": [
     "skill",
     "skillerr",
-    "dot-skill",
     ".skill",
     "ai-agents",
     "agent-skills",
@@ -24,23 +23,23 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @dot-skill/protocol && npm run build -w @dot-skill/core && npm run build -w @dot-skill/runtime && npm run build -w @dot-skill/registry && npm run build -w @dot-skill/workspace && npm run build -w @dot-skill/cli",
-    "test": "npm run build && npm run test -w @dot-skill/cli",
-    "test:examples": "SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/knowledge-only/recipe.json --approve --profile continuity -o /tmp/dot-skill-knowledge.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/parameterized-integration/recipe.json --approve --profile continuity -o /tmp/dot-skill-integration.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/code-changing/recipe.json --approve --profile continuity -o /tmp/dot-skill-code.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/contract-foundation/source.json --profile release -o /tmp/dot-skill-contract.skill",
+    "build": "npm run build -w @skillerr/protocol && npm run build -w @skillerr/core && npm run build -w @skillerr/runtime && npm run build -w @skillerr/registry && npm run build -w @skillerr/workspace && npm run build -w @skillerr/cli",
+    "test": "npm run build && npm run test -w @skillerr/cli",
+    "test:examples": "SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/knowledge-only/recipe.json --approve --profile continuity -o /tmp/skillerr-knowledge.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/parameterized-integration/recipe.json --approve --profile continuity -o /tmp/skillerr-integration.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/code-changing/recipe.json --approve --profile continuity -o /tmp/skillerr-code.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/contract-foundation/source.json --profile release -o /tmp/skillerr-contract.skill",
     "pack:check": "npm pack --workspaces --dry-run",
     "pack:check:meta": "npm pack -w skillerr --dry-run",
     "skill": "node packages/cli/dist/cli.js",
-    "dot-skill": "node packages/cli/dist/cli.js"
+    "skillerr": "node packages/cli/dist/cli.js"
   },
   "engines": {
     "node": ">=20"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dot-skill/dot-skill.git"
+    "url": "https://github.com/skillerr/skillerr.git"
   },
-  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "homepage": "https://skillerr.com",
   "bugs": {
-    "url": "https://github.com/dot-skill/dot-skill/issues"
+    "url": "https://github.com/skillerr/skillerr/issues"
   }
 }

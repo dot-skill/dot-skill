@@ -21,8 +21,8 @@ import type {
   SkillCompileProfile,
   SkillSource,
   SkillSection,
-} from "@dot-skill/protocol";
-import { isValidAgentHost, PROTOCOL_VERSION } from "@dot-skill/protocol";
+} from "@skillerr/protocol";
+import { isValidAgentHost, PROTOCOL_VERSION } from "@skillerr/protocol";
 import {
   compileSkillSource,
   approveCompilation,
@@ -30,7 +30,7 @@ import {
   redactSecrets,
   CompileRefusalError,
   type CompileResult,
-} from "@dot-skill/core";
+} from "@skillerr/core";
 
 export const WORKSPACE_DIR = ".skill";
 
@@ -319,7 +319,7 @@ export async function status(root: string): Promise<StatusResult> {
   try {
     if (staged.length) {
       const source = await toSkillSource(root, staged, "status", "continuity");
-      const { assessCompleteness } = await import("@dot-skill/core");
+      const { assessCompleteness } = await import("@skillerr/core");
       completeness = assessCompleteness(source, {
         profile: "release",
         hasWorkflowAction: staged.some((s) =>
@@ -390,7 +390,7 @@ async function toSkillSource(
       host,
       provider: process.env.SKILL_PROVIDER,
       model: process.env.SKILL_MODEL,
-      runtime: process.env.SKILL_AGENT_RUNTIME ?? "@dot-skill/cli",
+      runtime: process.env.SKILL_AGENT_RUNTIME ?? "@skillerr/cli",
       deployment: (process.env.SKILL_DEPLOYMENT as
         | "local"
         | "hosted"
@@ -425,7 +425,7 @@ function loadWorkspaceIdentity(): { name: string; version: string } {
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
   ) as { name?: unknown; version?: unknown };
   if (typeof metadata.name !== "string" || typeof metadata.version !== "string") {
-    throw new Error("Invalid @dot-skill/workspace package metadata");
+    throw new Error("Invalid @skillerr/workspace package metadata");
   }
   return { name: metadata.name, version: metadata.version };
 }
@@ -650,7 +650,7 @@ export async function loadSkillHandoff(packagePath: string): Promise<{
   open_questions?: string[];
   mint_status?: string;
 }> {
-  const { unpackSkill } = await import("@dot-skill/core");
+  const { unpackSkill } = await import("@skillerr/core");
   const bytes = new Uint8Array(await readFile(resolve(packagePath)));
   const u = unpackSkill(bytes);
   const journey = u.raw.provenance?.journey as
