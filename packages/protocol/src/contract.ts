@@ -141,6 +141,21 @@ export interface VerificationAssertion {
   required: boolean;
 }
 
+/**
+ * PHASE 2: a native eval/benchmark case — a test prompt plus the
+ * assertions a run against it should satisfy. Reuses VerificationAssertion
+ * rather than inventing a parallel shape; `check` still means what it
+ * means there (runtime = machine-gradable, human/capability = needs a
+ * human or a capability call to judge). See docs/EVAL.md.
+ */
+export interface EvalCase {
+  id: string;
+  prompt: string;
+  assertions: VerificationAssertion[];
+  /** Optional input files the prompt references (paths are informational — not auto-loaded). */
+  files?: string[];
+}
+
 export interface ContractCorrection {
   id: string;
   lesson: string;
@@ -190,6 +205,14 @@ export interface SkillContract {
   verification: ExplicitDeclaration<VerificationAssertion>;
   corrections: ExplicitDeclaration<ContractCorrection>;
   provenance: ContractProvenance;
+  /**
+   * PHASE 2: optional native eval/benchmark cases. Unlike every field
+   * above, this is genuinely optional (not `ExplicitDeclaration` requiring
+   * an explicit none/not_applicable reason) — most skills won't have this
+   * authored yet, and assessSkillContract() does not require it for either
+   * profile. See docs/EVAL.md.
+   */
+  evals?: EvalCase[];
 }
 
 export type ContractField =

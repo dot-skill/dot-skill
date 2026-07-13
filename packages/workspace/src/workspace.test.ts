@@ -10,13 +10,17 @@ import { test } from "node:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeFileSync } from "node:fs";
 import {
   requireAgentHost,
   initWorkspace,
   loadWorkspaceContract,
   saveWorkspaceContract,
+  proposeSection,
+  stage,
+  compileWorkspace,
 } from "./index.js";
-import type { SkillContract } from "@skillerr/protocol";
+import type { BenchmarkReport, SkillContract } from "@skillerr/protocol";
 
 test("requireAgentHost: throws for denylisted/missing hosts, returns a valid one", () => {
   assert.throws(() => requireAgentHost("human"), /AI agent provenance required/);
@@ -75,4 +79,41 @@ test("loadWorkspaceContract: a file that doesn't look like a SkillContract is a 
   const result = await loadWorkspaceContract(dir);
   assert.equal(result.contract, undefined);
   assert.match(result.error ?? "", /not valid JSON/);
+});
+
+test("PHASE 2: compileWorkspace seals a pre-written .skill/benchmark.json into provenance/benchmark.json, and its absence changes nothing", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "skill-ws-unit-"));
+  await initWorkspace(dir, { title: "Eval attach unit" });
+  await proposeSection(dir, { title: "Note", body: "Body text.", host: "cursor" });
+  await stage(dir, "all");
+
+  const withoutBenchmark = await compileWorkspace(dir, { profile: "continuity", host: "cursor" });
+  assert.equal(withoutBenchmark.compile.files.provenance?.benchmark, undefined);
+
+  const benchmark: BenchmarkReport = {
+    kind: "benchmark_report",
+    skill_id: "skl_placeholder",
+    host: "cursor",
+    created_at: "2026-07-13T00:00:00.000Z",
+    cases: [
+      {
+        id: "e1",
+        prompt: "test prompt",
+        executable: true,
+        duration_ms: 5,
+        assertions: [
+          { id: "a1", assertion: 'contains: "x"', check: "runtime", status: "pass" },
+        ],
+      },
+    ],
+    summary: { total_cases: 1, total_assertions: 1, pass: 1, fail: 0, partial: 0, pending_human: 0 },
+  };
+  writeFileSync(join(dir, ".skill", "benchmark.json"), JSON.stringify(benchmark, null, 2));
+
+  const withBenchmark = await compileWorkspace(dir, { profile: "continuity", host: "cursor" });
+  assert.deepEqual(withBenchmark.compile.files.provenance?.benchmark, benchmark);
+  // The seal must actually be in the repacked bytes, not just the in-memory files object.
+  const { unpackSkill } = await import("@skillerr/core");
+  const unpacked = unpackSkill(withBenchmark.compile.packageBytes);
+  assert.deepEqual(unpacked.raw.provenance?.benchmark, benchmark);
 });

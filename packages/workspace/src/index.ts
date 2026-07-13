@@ -28,10 +28,12 @@ import {
   compileSkillSource,
   approveCompilation,
   mintSkillPackage,
+  packSkill,
   redactSecrets,
   CompileRefusalError,
   type CompileResult,
 } from "@skillerr/core";
+import type { BenchmarkReport } from "@skillerr/protocol";
 
 export const WORKSPACE_DIR = ".skill";
 
@@ -117,6 +119,7 @@ function paths(root: string) {
     ingredientsLegacy: join(base, "ingredients"),
     objects: join(base, "objects"),
     contract: join(base, "contract.json"),
+    benchmark: join(base, "benchmark.json"),
   };
 }
 
@@ -593,6 +596,23 @@ export async function compileWorkspace(
       throw e;
     }
     throw e;
+  }
+
+  // PHASE 2: if `skill eval --attach` wrote .skill/benchmark.json before
+  // this compile, seal it into provenance/benchmark.json — never fabricate
+  // one; absence just means no eval ran yet, which is the common case.
+  if (existsSync(paths(root).benchmark)) {
+    const benchmark = JSON.parse(
+      readFileSync(paths(root).benchmark, "utf8"),
+    ) as BenchmarkReport;
+    compiled = {
+      ...compiled,
+      files: {
+        ...compiled.files,
+        provenance: { ...compiled.files.provenance, benchmark },
+      },
+    };
+    compiled.packageBytes = packSkill(compiled.files);
   }
 
   if (opts.approve === true) {

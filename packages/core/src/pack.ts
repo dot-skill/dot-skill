@@ -194,6 +194,9 @@ export function buildFileMap(pkg: SkillPackageFiles): Record<string, Uint8Array>
       pkg.provenance.compilation_report,
     );
   }
+  if (pkg.provenance?.benchmark) {
+    files["provenance/benchmark.json"] = textEncode(pkg.provenance.benchmark);
+  }
   if (pkg.attestation && !pkg.signatures?.["creation.dsse.json"]) {
     files["signatures/creation.attestation.json"] = textEncode(pkg.attestation);
   }
@@ -358,6 +361,9 @@ export function unpackSkill(archive: Uint8Array): UnpackResult {
         ? JSON.parse(strFromU8(unzipped["provenance/proof.json"]))
         : undefined,
       compilation_report,
+      benchmark: unzipped["provenance/benchmark.json"]
+        ? JSON.parse(strFromU8(unzipped["provenance/benchmark.json"]))
+        : undefined,
     },
     signatures,
     attestation,

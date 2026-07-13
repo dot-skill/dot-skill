@@ -38,7 +38,10 @@ import {
   defaultTrustStorePath,
   ingestSkillMd,
   packSkill,
+  runEvalCase,
+  buildBenchmarkReport,
 } from "@skillerr/core";
+import type { GradeOverride } from "@skillerr/core";
 import { runSkillArchive } from "@skillerr/runtime";
 import { lookup, list, verify as registryVerify, publish as registryPublish } from "@skillerr/registry";
 import type { Recipe, SectionType, Skill, SkillContract, SkillSource } from "@skillerr/protocol";
@@ -68,6 +71,7 @@ import {
   saveWorkspaceContract,
   setJourney,
   requireAgentHost,
+  WORKSPACE_DIR,
 } from "@skillerr/workspace";
 
 function loadPackageVersion(): string {
@@ -122,6 +126,13 @@ Ingest / run:
                                        folder into a continuity .skill (never
                                        fabricates release completeness — prints
                                        exactly what still needs authoring)
+  skill eval <workspace|file.skill> [--host] [--responses f.json]
+             [--grade f.json] [--usage f.json] [-o benchmark.json] [--attach]
+                                       Run contract.evals, grade what's
+                                       machine-checkable, leave the rest
+                                       pending_human (never a fabricated
+                                       pass). --attach seals it into the
+                                       next compile's provenance/benchmark.json
   skill inspect <file.skill> [--trust] [--trust-store <path>]
                                        TrustView (no compile / no model body)
   skill validate <file.skill>          Structure + hash integrity
@@ -722,6 +733,108 @@ async function main() {
             next: releaseAssessment.complete
               ? `Release-ready as authored. Review, then: skill pack <source> --approve --profile release, or promote this workspace and skill compile --mint.`
               : `Continuity draft written to ${out}. Fill the fields listed in missing_for_release (start with provenance.human_review — ingest can never fabricate that), then re-assess before a release compile.`,
+          },
+          null,
+          2,
+        ),
+      );
+      break;
+    }
+    case "eval": {
+      const inputArg = rest[0];
+      const host = requireAgentHost(opt(rest, "--host"));
+
+      let contract: SkillContract | undefined;
+      let dryRunBytes: Uint8Array | undefined;
+      let skillId: string;
+      let workspaceRoot: string | undefined;
+
+      if (inputArg && inputArg.endsWith(".skill")) {
+        const bytes = new Uint8Array(await readFile(resolve(inputArg)));
+        const unpacked = unpackSkill(bytes);
+        contract = unpacked.manifest.contract;
+        dryRunBytes = bytes;
+        skillId = unpacked.manifest.id;
+      } else {
+        workspaceRoot = requireWorkspace(inputArg ? resolve(inputArg) : undefined);
+        const loaded = await loadWorkspaceContract(workspaceRoot);
+        if (loaded.error) {
+          throw new Error(`.skill/contract.json is present but broken: ${loaded.error}`);
+        }
+        contract = loaded.contract;
+        const compiled = await compileWorkspace(workspaceRoot, { profile: "continuity", host });
+        dryRunBytes = compiled.compile.packageBytes;
+        skillId = compiled.compile.files.manifest.id;
+      }
+
+      if (!contract?.evals || contract.evals.length === 0) {
+        console.log(
+          JSON.stringify(
+            {
+              ok: false,
+              error:
+                "No evals declared. Add an `evals` array to the contract (see docs/EVAL.md) — id, prompt, and assertions per case.",
+            },
+            null,
+            2,
+          ),
+        );
+        process.exit(2);
+      }
+
+      const readJsonOpt = async (flagName: string): Promise<Record<string, unknown>> => {
+        const path = opt(rest, flagName);
+        if (!path) return {};
+        return JSON.parse(await readFile(resolve(path), "utf8")) as Record<string, unknown>;
+      };
+      const responses = (await readJsonOpt("--responses")) as Record<string, string>;
+      const usage = (await readJsonOpt("--usage")) as Record<string, number>;
+      const grades = (await readJsonOpt("--grade")) as Record<
+        string,
+        Record<string, GradeOverride>
+      >;
+
+      const results = [];
+      for (const evalCase of contract.evals) {
+        const start = Date.now();
+        let executable = false;
+        if (dryRunBytes) {
+          const run = await runSkillArchive(dryRunBytes, { host }, { mode: "dry_run" });
+          executable = run.status === "succeeded" || run.status === "paused";
+        }
+        results.push(
+          runEvalCase(evalCase, {
+            response: responses[evalCase.id],
+            executable,
+            duration_ms: Date.now() - start,
+            total_tokens: usage[evalCase.id],
+            overrides: grades[evalCase.id],
+          }),
+        );
+      }
+
+      const report = buildBenchmarkReport(skillId, host, results);
+      const out = opt(rest, "-o") ?? "benchmark.json";
+      await writeFile(resolve(out), JSON.stringify(report, null, 2) + "\n");
+
+      if (workspaceRoot && flag(rest, "--attach")) {
+        await writeFile(
+          join(workspaceRoot, WORKSPACE_DIR, "benchmark.json"),
+          JSON.stringify(report, null, 2) + "\n",
+        );
+      }
+
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            out,
+            summary: report.summary,
+            attached: Boolean(workspaceRoot && flag(rest, "--attach")),
+            next:
+              report.summary.pending_human > 0
+                ? `${report.summary.pending_human} assertion(s) still need a human/agent verdict — supply --grade <file.json> and re-run, or review ${out} directly. Never treat pending_human as a pass.`
+                : "All assertions graded.",
           },
           null,
           2,

@@ -35,6 +35,8 @@ export {
 export type { ValidationIssue, ValidationResult } from "./validate.js";
 export { migrateLegacySkill, toSkillMdAdapter } from "./migrate.js";
 export { ingestSkillMd } from "./ingest.js";
+export { gradeAssertion, runEvalCase, buildBenchmarkReport } from "./eval.js";
+export type { GradeOverride, RunEvalCaseOptions } from "./eval.js";
 export type { IngestOptions, IngestResult, IngestReport } from "./ingest.js";
 export {
   mintSkillPackage,

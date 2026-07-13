@@ -33,6 +33,8 @@ Status: protocol **Draft 0.5.0**; reference packages **0.6.0**.
 - [x] Forward `SKILL.md` -> `.skill` ingest (`skill ingest`), distinct from
       the existing lossy `to-skill-md` export — see
       [examples/ingest-skill-md/](../examples/ingest-skill-md/)
+- [x] Native eval/benchmark loop (`skill eval`, sealed
+      `provenance/benchmark.json`) — see [docs/EVAL.md](./EVAL.md)
 
 ## Next (great contribution targets)
 
@@ -47,8 +49,9 @@ Status: protocol **Draft 0.5.0**; reference packages **0.6.0**.
 - [ ] Second language runtime (Go or Rust) for Stable eligibility — reproduce
       the adversarial corpus and canonicalization vectors byte-for-byte
       (now also covers Ed25519/PEM signing — see CONTRIBUTING.md)
-- [ ] Native eval/benchmark loop (`skill eval`) and wiring `skill-score` in
-      as a sealed `provenance/score.json` receipt
+- [ ] Wire `@skillerr/skill-score` in as the consumer of `benchmark.json`,
+      with a sealed `provenance/score.json` receipt (Stronger `verify`
+      assertion language above feeds this too)
 
 ## Later
 
