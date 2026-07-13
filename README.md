@@ -1,10 +1,11 @@
 # Skillerr
 
 <p align="center">
-  <img src="./assets/skillerr-mark.png" alt="Skillerr mark — the Dotling" width="128" height="128" />
+  <img src="./assets/skillerr-mark.png" alt="Skillerr mark — the Dotling" width="160" height="160" />
 </p>
 
 <p align="center"><strong>Skillerr</strong></p>
+<p align="center"><em>The Dotling — living <code>.</code> of <code>.skill</code></em></p>
 
 Open protocol and portable **`.skill`** format for AI skills — built so your **AI agent** can create, inspect, hand off, and run skills. You install once; then you talk to your AI.
 

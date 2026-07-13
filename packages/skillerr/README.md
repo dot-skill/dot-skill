@@ -1,10 +1,11 @@
 # skillerr
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/dot-skill/dot-skill/main/assets/skillerr-mark.png" alt="Skillerr mark — the Dotling" width="128" height="128" />
+  <img src="https://raw.githubusercontent.com/dot-skill/dot-skill/main/assets/skillerr-mark.png" alt="Skillerr mark — the Dotling" width="160" height="160" />
 </p>
 
 <p align="center"><strong>Skillerr</strong></p>
+<p align="center"><em>The Dotling — living <code>.</code> of <code>.skill</code></em></p>
 
 Reference CLI for **Skillerr** — portable `.skill` packages for AI agents.
 
