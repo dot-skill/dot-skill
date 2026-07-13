@@ -1,0 +1,17 @@
+{
+  "name": "@skillerr/website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev docs",
+    "build": "node scripts/build-fixtures.mjs && vitepress build docs",
+    "preview": "vitepress preview docs",
+    "fixtures:build": "node scripts/build-fixtures.mjs",
+    "fixtures:test": "node scripts/test-fixtures.mjs"
+  },
+  "devDependencies": {
+    "mermaid": "^11.4.0",
+    "vitepress": "^1.6.3",
+    "vitepress-plugin-mermaid": "^2.0.17"
+  }
+}

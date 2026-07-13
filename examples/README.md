@@ -27,3 +27,21 @@ What an agent runs for the multi-skill identify path:
 skill agent-guide
 skill extract examples/multi-skill-extract/journey.json -o /tmp/skillerr-extract
 ```
+
+## Packed fixtures (validated)
+
+Pre-packed `.skill` downloads (also served from [skillerr.com/examples/](https://skillerr.com/examples/)):
+
+| File | Profile |
+|------|---------|
+| [`packs/skillerr-knowledge.skill`](./packs/skillerr-knowledge.skill) | continuity |
+| [`packs/skillerr-integration.skill`](./packs/skillerr-integration.skill) | continuity |
+| [`packs/skillerr-code.skill`](./packs/skillerr-code.skill) | continuity |
+| [`packs/skillerr-contract.skill`](./packs/skillerr-contract.skill) | release |
+
+Regenerate:
+
+```bash
+npm run test:examples
+# then copy /tmp/skillerr-*.skill → examples/packs/ and site/public/examples/
+```

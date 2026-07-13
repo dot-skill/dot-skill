@@ -1,0 +1,62 @@
+name: Deploy docs (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "examples/**"
+      - "packages/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
+
+      - name: Build reference CLI
+        run: npm ci && npm run build
+
+      - name: Install website deps
+        working-directory: website
+        run: npm ci
+
+      - name: Build fixtures and site
+        working-directory: website
+        env:
+          DOT_SKILL_ROOT: ${{ github.workspace }}
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/docs/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
