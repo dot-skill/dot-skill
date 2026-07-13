@@ -2,7 +2,7 @@
 
 ## What is the `.skill` Protocol?
 
-An open format for **portable AI skills**: typed inputs, workflow, pinned knowledge, redacted journey provenance, optional token usage, integrity digests, and mint attestation. Home: [skillerr.com](https://skillerr.com).
+An open format for **portable AI skills**: typed inputs, workflow, pinned knowledge, redacted journey provenance, optional token usage, integrity digests, and mint attestation. Home: [skillerr.com](https://dot-skill.github.io/skillerr-com/).
 
 ## How do I use Skillerr?
 

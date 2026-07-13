@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.4 — 2026-07-13
+
+- New transparent `.skill` mark — coffee-wave scroll motif replaces stacked diamonds; teal accent on waves.
+- Public homepage and doc links point at live GitHub Pages (`https://dot-skill.github.io/skillerr-com/`) until `skillerr.com` DNS is set.
+
 ## 0.6.3 — 2026-07-13
 
 - Replace Arcane Shimmer banner with a plain diagrammatic `.skill` insides README banner (identity, instructions, capabilities, seal, assets).
@@ -19,7 +24,7 @@
 
 - Renamed npm scope from `@dot-skill/*` to `@skillerr/*` (protocol, core, runtime, registry, workspace, cli).
 - Public install remains `npm i -g skillerr` (bins: `skill`, `skillerr`).
-- Homepage and docs point to [skillerr.com](https://skillerr.com); repository URLs track `dot-skill/skillerr`.
+- Homepage and docs point to [skillerr.com](https://dot-skill.github.io/skillerr-com/); repository URLs track `dot-skill/skillerr`.
 - Local registry default path is `~/.skillerr/registry/log.jsonl` (reads legacy `~/.dot-skill/…` if present).
 - Preserved `.skill` artifact extension and wire identifiers (`kind: "dot-skill"`, `application/vnd.dot-skill+zip`).
 

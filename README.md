@@ -9,7 +9,7 @@
 
 Open protocol and portable **`.skill`** format for AI skills — built so your **AI agent** can create, inspect, hand off, and run skills. You install once; then you talk to your AI.
 
-**Site:** [skillerr.com](https://skillerr.com) · **Artifact:** `.skill` (sealed ZIP) · **Reference CLI:** [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill`) · **Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr)
+**Site:** [skillerr.com](https://dot-skill.github.io/skillerr-com/) · **Artifact:** `.skill` (sealed ZIP) · **Reference CLI:** [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill`) · **Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr)
 
 [![npm](https://img.shields.io/npm/v/skillerr.svg)](https://www.npmjs.com/package/skillerr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
@@ -165,7 +165,7 @@ Host authors typically integrate the protocol libraries; end users install **`sk
 - [Protocol](./docs/PROTOCOL.md) · [Agent](./docs/AGENT.md) · [Prompts](./examples/prompts.md)
 - [Why structured packages](./docs/WHY.md) · [Continuity](./docs/CONTINUITY.md) · [Privacy](./docs/PRIVACY.md)
 - [FAQ](./docs/FAQ.md) · [Security](./docs/SECURITY.md) · [Roadmap](./docs/ROADMAP.md)
-- Site guides: [skillerr.com](https://skillerr.com)
+- Site guides: [skillerr.com](https://dot-skill.github.io/skillerr-com/)
 
 ---
 

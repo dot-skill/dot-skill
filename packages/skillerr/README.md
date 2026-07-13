@@ -15,7 +15,7 @@ Reference CLI for **Skillerr** — portable `.skill` packages for AI agents.
 
 You install once. Then you **point your AI** at Skillerr. The agent creates, inspects, hands off, and dry-runs skills; you review and approve releases.
 
-**Bin:** `skill` · **Site:** [skillerr.com](https://skillerr.com) · **Format:** `.skill` · **Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr) · **License:** MIT
+**Bin:** `skill` · **Site:** [skillerr.com](https://dot-skill.github.io/skillerr-com/) · **Format:** `.skill` · **Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr) · **License:** MIT
 
 [![npm](https://img.shields.io/npm/v/skillerr.svg)](https://www.npmjs.com/package/skillerr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../LICENSE)
@@ -91,7 +91,7 @@ Digests and seals are visible without execution. Prefer inspect → validate →
 ## Documentation
 
 - [Protocol](../../docs/PROTOCOL.md) · [Agent](../../docs/AGENT.md) · [Prompts](../../examples/prompts.md)
-- [Security](../../docs/SECURITY.md) · [skillerr.com](https://skillerr.com)
+- [Security](../../docs/SECURITY.md) · [skillerr.com](https://dot-skill.github.io/skillerr-com/)
 
 End users install **`skillerr`**. Host authors integrate `@skillerr/*` libraries or an independent conforming implementation.
 
