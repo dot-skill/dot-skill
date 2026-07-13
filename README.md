@@ -1,7 +1,7 @@
 # Skillerr
 
 <p align="center">
-  <img src="./assets/skillerr-pixel.png" alt="Skillerr pixel mark — sealed skill package" width="128" height="128" />
+  <img src="./assets/skillerr-mark.png" alt="Skillerr mark — the Dotling" width="128" height="128" />
 </p>
 
 <p align="center"><strong>Skillerr</strong></p>
