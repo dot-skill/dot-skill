@@ -1,0 +1,59 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing + provenance require npm >= 11.5.1
+      - run: npm install -g npm@latest
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:examples
+      - run: npm run pack:check
+
+      # Publish order: protocol → core → runtime → registry → workspace → cli → skillerr
+      # OIDC trusted publishing authenticates when configured on npmjs.com.
+      # Optional fallback: repository secret NPM_TOKEN (automation token).
+      - name: Publish packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          publish_one() {
+            local ws="$1"
+            echo "::group::npm publish -w ${ws}"
+            npm publish -w "${ws}" --access public
+            echo "::endgroup::"
+          }
+          publish_one @skillerr/protocol
+          publish_one @skillerr/core
+          publish_one @skillerr/runtime
+          publish_one @skillerr/registry
+          publish_one @skillerr/workspace
+          publish_one @skillerr/cli
+          echo "::group::npm publish -w skillerr"
+          npm publish -w skillerr
+          echo "::endgroup::"

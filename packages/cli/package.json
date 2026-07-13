@@ -23,16 +23,17 @@
   },
   "main": "./dist/cli.js",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/skillerr/skillerr.git",
+    "url": "https://github.com/dot-skill/dot-skill.git",
     "directory": "packages/cli"
   },
   "homepage": "https://skillerr.com",
   "bugs": {
-    "url": "https://github.com/skillerr/skillerr/issues"
+    "url": "https://github.com/dot-skill/dot-skill/issues"
   },
   "files": [
     "dist/cli.js",

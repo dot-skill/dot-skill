@@ -30,12 +30,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/skillerr/skillerr.git",
+    "url": "https://github.com/dot-skill/dot-skill.git",
     "directory": "packages/skillerr"
   },
   "homepage": "https://skillerr.com",
   "bugs": {
-    "url": "https://github.com/skillerr/skillerr/issues"
+    "url": "https://github.com/dot-skill/dot-skill/issues"
   },
   "engines": {
     "node": ">=20"
@@ -45,5 +45,8 @@
   },
   "scripts": {
     "prepack": "node -e \"require('fs').accessSync('bin/skill.js')\""
+  },
+  "publishConfig": {
+    "provenance": true
   }
 }
