@@ -5,7 +5,9 @@
 - **Inspect before run** — `skill inspect --trust` shows TrustView (seal, issuer, host/model claims, digests) without compiling or feeding package body to a model
 - Validate before extract; reject traversal, symlinks, bombs, hash mismatch
 - Secrets never embedded — references only
-- **Deny-by-default runtime** — undeclared network / filesystem / secret capabilities are refused; missing consent fails closed
+- **Deny-by-default runtime** — undeclared network / filesystem / secret capabilities are refused; missing consent fails closed. This includes `read`: a declared `read` permission is required exactly like `write`/`destructive`
+- Network host allowlists match the parsed hostname exactly, or a `*.example.com` suffix — never a bare substring/prefix (`example.com` does not match `evil.com/?q=example.com` or `example.com.attacker.io`)
+- Filesystem `permission.paths` / `policy.filesystem_roots` checks normalize the candidate path first, so `/data/../etc/passwd` cannot pass a `/data` root check
 - **Unsigned / open packages** are labeled untrusted; `execute` refuses them unless `--allow-untrusted`
 - Reference mint HMAC (`dot-skill-dev-mint-key`) is **public-dev only** — TrustView labels it `development`, never production trust
 - Trust profiles: `open` | `minted` | `anchored` | `issuer:<id>`

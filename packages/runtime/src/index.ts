@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { posix as posixPath } from "node:path";
 import type {
   CapabilityAdapterHint,
   CapabilityRequirement,
@@ -94,6 +95,51 @@ function permissionCovers(
 }
 
 /**
+ * SEC-A: extract the real hostname from a bare host, "host:port", or full
+ * URL. Using the WHATWG URL parser (rather than substring/startsWith checks
+ * against the raw string) closes bypasses like
+ * `https://evil.com/?q=example.com` (substring match) and
+ * `example.com.attacker.io` (prefix match) against an allowlisted
+ * `example.com`.
+ */
+function extractHostname(value: string): string | undefined {
+  try {
+    const url = new URL(value.includes("://") ? value : `https://${value}`);
+    return url.hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Exact hostname match, or a `*.example.com` allowlist entry matching as a
+ * dot-anchored suffix — never a bare substring/prefix match.
+ */
+function hostMatchesAllowlist(hostArg: string, allowed: string[]): boolean {
+  const hostname = extractHostname(hostArg);
+  if (!hostname) return false;
+  return allowed.some((entry) => {
+    const pattern = entry.trim().toLowerCase();
+    if (pattern.startsWith("*.")) {
+      const bare = pattern.slice(2);
+      return hostname === bare || hostname.endsWith(`.${bare}`);
+    }
+    return hostname === pattern;
+  });
+}
+
+/**
+ * SEC-B: normalize with posix-resolve semantics before comparing so
+ * `/data/../etc/passwd` can't pass a `startsWith("/data/")` prefix check —
+ * it normalizes to `/etc/passwd`, which correctly fails against root `/data`.
+ */
+function isPathWithinRoot(pathArg: string, root: string): boolean {
+  const normPath = posixPath.normalize(pathArg);
+  const normRoot = posixPath.normalize(root).replace(/\/+$/, "") || "/";
+  return normPath === normRoot || normPath.startsWith(`${normRoot}/`);
+}
+
+/**
  * Deny-by-default: refuse undeclared network / filesystem / secret adapter use.
  * Fail closed when consent is required but missing.
  */
@@ -125,11 +171,11 @@ export function assertCapabilityAllowed(
           : typeof args.endpoint === "string"
             ? args.endpoint
             : undefined;
-    if (perm.hosts?.length && hostArg) {
-      const ok = perm.hosts.some(
-        (h) => hostArg === h || hostArg.includes(h) || hostArg.startsWith(h),
-      );
-      if (!ok) {
+    if (perm.hosts?.length) {
+      // Deny-by-default extends to "can't tell what host this call targets"
+      // — an allowlist was declared, so silently letting an unattributable
+      // call through would defeat it.
+      if (!hostArg || !hostMatchesAllowlist(hostArg, perm.hosts)) {
         throw new Error(
           `Denied: network host/url not in declared permission.hosts for ${cap.name}`,
         );
@@ -139,7 +185,11 @@ export function assertCapabilityAllowed(
 
   if (side === "read" || side === "write" || side === "destructive") {
     const perm = permissionCovers(pkg.manifest.permissions, side);
-    if (!perm && side !== "read") {
+    // SEC-H: `read` used to be exempt from deny-by-default (undeclared reads
+    // were allowed), contradicting the documented deny-by-default model and
+    // leaving an exfiltration path (read an arbitrary file, emit it later).
+    // A declared read permission is now required like write/destructive.
+    if (!perm) {
       throw new Error(
         `Denied: capability ${cap.name} uses ${side} but no matching permission is declared`,
       );
@@ -154,19 +204,15 @@ export function assertCapabilityAllowed(
             : undefined;
     const roots = policy.filesystem_roots;
     if (pathArg && roots?.length) {
-      const ok = roots.some(
-        (root) => pathArg === root || pathArg.startsWith(root.endsWith("/") ? root : `${root}/`),
-      );
+      const ok = roots.some((root) => isPathWithinRoot(pathArg, root));
       if (!ok) {
         throw new Error(
           `Denied: path ${pathArg} outside policy.filesystem_roots for ${cap.name}`,
         );
       }
     }
-    if (pathArg && perm?.paths?.length) {
-      const ok = perm.paths.some(
-        (p) => pathArg === p || pathArg.startsWith(p.endsWith("/") ? p : `${p}/`),
-      );
+    if (pathArg && perm.paths?.length) {
+      const ok = perm.paths.some((p) => isPathWithinRoot(pathArg, p));
       if (!ok) {
         throw new Error(
           `Denied: path ${pathArg} not in declared permission.paths for ${cap.name}`,

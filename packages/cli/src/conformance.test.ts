@@ -7,6 +7,7 @@ import {
   inspectSkill,
   inspectTrustView,
   migrateLegacySkill,
+  normalizePath,
   packSkill,
   sha256Digest,
   sealedManifestDigest,
@@ -1726,6 +1727,144 @@ test("P0: undeclared network capability is refused", async () => {
   );
   assert.equal(run.status, "failed");
   assert.match(run.error ?? "", /allow_network=false|Denied/);
+});
+
+function minimalPackage(overrides: {
+  policy?: Partial<typeof DEFAULT_SKILL_POLICY>;
+  permissions?: SkillPackageFiles["manifest"]["permissions"];
+}): SkillPackageFiles {
+  return {
+    manifest: {
+      kind: "dot-skill",
+      id: "skl_secfix",
+      version: "1.0.0",
+      title: "SEC fixture",
+      description: "SEC-A/B/H fixture",
+      container_version: CONTAINER_VERSION,
+      protocol_version: PROTOCOL_VERSION,
+      entrypoint: "s1",
+      inputs: [],
+      outputs: [],
+      capabilities: [],
+      permissions: overrides.permissions ?? [],
+      policy: { ...DEFAULT_SKILL_POLICY, ...overrides.policy },
+      content: [],
+      package_digest: "sha256:" + "0".repeat(64),
+      provenance_mode: "proof_only",
+    },
+    workflow: {
+      kind: "workflow",
+      dialect_version: WORKFLOW_DIALECT_VERSION,
+      entrypoint: "s1",
+      steps: [{ id: "s1", kind: "instruct", text: "x" }],
+    },
+    knowledge: [],
+  };
+}
+
+test("SEC-A: network host allowlist compares real hostnames, not substrings/prefixes", () => {
+  const netCap = {
+    name: "http.fetch",
+    description: "Fetch URL",
+    side_effect_class: "network" as const,
+    fallback: "fail" as const,
+    required: false,
+  };
+  const pkg = minimalPackage({
+    policy: { allow_network: true },
+    permissions: [
+      {
+        side_effect_class: "network",
+        description: "Fetch from example.com",
+        hosts: ["example.com"],
+        requires_consent: false,
+      },
+    ],
+  });
+
+  // Substring bypass: "example.com" appears inside the URL, but the real host is evil.com.
+  assert.throws(
+    () => assertCapabilityAllowed(pkg, netCap, { url: "https://evil.com/?q=example.com" }),
+    /not in declared permission.hosts/,
+  );
+  // Prefix bypass: startsWith("example.com") is true, but the real host is a different domain.
+  assert.throws(
+    () => assertCapabilityAllowed(pkg, netCap, { host: "example.com.attacker.io" }),
+    /not in declared permission.hosts/,
+  );
+  // No attributable host at all — deny rather than silently allow.
+  assert.throws(
+    () => assertCapabilityAllowed(pkg, netCap, {}),
+    /not in declared permission.hosts/,
+  );
+  // The real, legitimately allowlisted host still works.
+  assert.doesNotThrow(() => assertCapabilityAllowed(pkg, netCap, { url: "https://example.com/v1" }));
+
+  const wildcardPkg = minimalPackage({
+    policy: { allow_network: true },
+    permissions: [
+      {
+        side_effect_class: "network",
+        description: "Fetch from any example.com subdomain",
+        hosts: ["*.example.com"],
+        requires_consent: false,
+      },
+    ],
+  });
+  assert.doesNotThrow(() => assertCapabilityAllowed(wildcardPkg, netCap, { host: "api.example.com" }));
+  assert.throws(
+    () => assertCapabilityAllowed(wildcardPkg, netCap, { host: "notexample.com" }),
+    /not in declared permission.hosts/,
+  );
+});
+
+test("SEC-B: filesystem permission/root checks normalize paths before comparing", () => {
+  const readCap = {
+    name: "fs.read",
+    description: "Read a file",
+    side_effect_class: "read" as const,
+    fallback: "fail" as const,
+    required: false,
+  };
+  const pkg = minimalPackage({
+    policy: { filesystem_roots: ["/data"] },
+    permissions: [
+      {
+        side_effect_class: "read",
+        description: "Read within /data",
+        paths: ["/data"],
+        requires_consent: false,
+      },
+    ],
+  });
+
+  assert.throws(
+    () => assertCapabilityAllowed(pkg, readCap, { path: "/data/../etc/passwd" }),
+    /outside policy.filesystem_roots/,
+  );
+  assert.doesNotThrow(() => assertCapabilityAllowed(pkg, readCap, { path: "/data/notes.txt" }));
+});
+
+test("SEC-C: normalizePath rejects Windows drive-letter and UNC absolute paths", () => {
+  assert.throws(() => normalizePath("C:/evil.txt"), /Unsafe path/);
+  assert.throws(() => normalizePath("C:\\evil.txt"), /Unsafe path/);
+  assert.throws(() => normalizePath("\\\\server\\share\\evil.txt"), /Unsafe path/);
+  assert.equal(normalizePath("knowledge/notes.txt"), "knowledge/notes.txt");
+});
+
+test("SEC-H: undeclared read capability is denied like write/destructive, not exempt from deny-by-default", () => {
+  const readCap = {
+    name: "fs.read",
+    description: "Read a file",
+    side_effect_class: "read" as const,
+    fallback: "fail" as const,
+    required: false,
+  };
+  const pkg = minimalPackage({ permissions: [] });
+  assert.throws(
+    () => assertCapabilityAllowed(pkg, readCap, { path: "/anything" }),
+    /no matching permission is declared/,
+  );
 });
 
 test("P0: execute refuses unsigned packages without --allow-untrusted", async () => {

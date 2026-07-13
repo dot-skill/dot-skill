@@ -1,4 +1,9 @@
-const UNSAFE = /(^\/)|(\.\.)|(^$)/;
+// Backslashes are converted to "/" before this runs, so a Windows absolute
+// path like "C:\evil.txt" arrives as "C:/evil.txt" — it has no leading "/"
+// and no "..", so the original two checks let it through. Reject drive
+// letters (C:) and UNC-style double-backslash roots explicitly; "//host/share"
+// already starts with "/" and is caught by the leading-slash rule.
+const UNSAFE = /(^\/)|(\.\.)|(^$)|(^[A-Za-z]:)/;
 
 export function normalizePath(path: string): string {
   const nfc = path.normalize("NFC").replace(/\\/g, "/");
