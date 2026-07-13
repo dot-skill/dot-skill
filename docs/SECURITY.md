@@ -3,6 +3,7 @@
 ## Practice
 
 - **Inspect before run** — `skill inspect --trust` shows TrustView (seal, issuer, host/model claims, digests) without compiling or feeding package body to a model
+- Plain `skill inspect` (no `--trust`) never verifies a signature — it's a structural summary. A package that merely claims `mint_status=minted` + `attestation_digest` (self-reported manifest fields, trivially hand-edited) is labeled `CLAIMS SEALED (unverified — run \`skill inspect --trust\`)`, never a bare "SEALED" that reads as already-verified
 - Validate before extract; reject traversal, symlinks, bombs, hash mismatch, and duplicate zip entries — unpacking streams through the archive so bomb/duplicate checks abort mid-decompression rather than after a malicious archive has already been fully inflated
 - Secrets never embedded — references only
 - **Deny-by-default runtime** — undeclared network / filesystem / secret capabilities are refused; missing consent fails closed. This includes `read`: a declared `read` permission is required exactly like `write`/`destructive`

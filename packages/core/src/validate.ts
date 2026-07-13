@@ -340,23 +340,17 @@ export function inspectSkill(archive: Uint8Array): {
   }
   const m = result.manifest;
   const mint_status = m.mint?.mint_status ?? "draft";
-  const signed = Boolean(
-    (result.manifest &&
-      Object.keys(
-        // signatures live outside validate result — infer from mint + attestation_digest
-        m.attestation_digest ? { signed: true } : {},
-      ).length) ||
-      mint_status === "minted",
-  );
-  // Lightweight label without full TrustView import cycle; CLI --trust uses inspectTrustView.
+  // inspectSkill is deliberately lightweight (no signature verification —
+  // that's inspectTrustView / `skill inspect --trust`). mint_status and
+  // attestation_digest are plain manifest fields the package itself claims;
+  // neither proves a valid signature exists. Label accordingly instead of
+  // the confident-sounding "SEALED", which read as verified when it wasn't.
+  const claimsSealed = mint_status === "minted" && Boolean(m.attestation_digest);
   let trust_label = "UNSIGNED / OPEN — untrusted";
   let trust_state = "untrusted";
-  if (mint_status === "minted" && m.attestation_digest) {
-    trust_label = "SEALED — use skill inspect --trust for issuer/host details";
+  if (claimsSealed) {
+    trust_label = "CLAIMS SEALED (unverified — run `skill inspect --trust` to verify the signature)";
     trust_state = "self_reported";
-  } else if (!signed || mint_status === "draft") {
-    trust_label = "UNSIGNED / OPEN — untrusted";
-    trust_state = "untrusted";
   }
   return {
     ok: result.ok,

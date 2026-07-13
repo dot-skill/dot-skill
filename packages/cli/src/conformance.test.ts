@@ -1889,6 +1889,63 @@ test("P0: human-fake SKILL_HOST cannot mint as trusted", () => {
   );
 });
 
+test("SEC-I: inspectSkill labels a minted package's seal as an unverified claim, not a confident SEALED", () => {
+  const recipe = demoRecipe();
+  recipe.id = "rcp_seci_real";
+  let compiled = compileRecipeToSkill(recipe, {
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+    host: "cursor",
+    profile: "release",
+  });
+  compiled = approveCompilation(compiled, { inputs: ["*"], permissions: true });
+  compiled.files.manifest.needs_human_review = false;
+  const { packageBytes } = mintSkillPackage(compiled.files, { host: "cursor" });
+
+  const inspected = inspectSkill(packageBytes);
+  assert.equal(inspected.summary.mint_status, "minted");
+  assert.match(inspected.summary.trust_label ?? "", /unverified/i);
+  assert.doesNotMatch(inspected.summary.trust_label ?? "", /^SEALED/);
+  assert.equal(inspected.summary.trust_state, "self_reported");
+});
+
+test("SEC-I: a forged mint_status/attestation_digest without a real signature is labeled unverified, and the deep trust check still refuses it", () => {
+  const recipe = demoRecipe();
+  recipe.id = "rcp_seci_forged";
+  const compiled = compileRecipeToSkill(recipe, {
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+    host: "cursor",
+    profile: "release",
+  });
+  // Forge mint_status + attestation_digest by hand — no signatures/
+  // artifact backs this claim. attestation_digest/mint_status aren't part
+  // of manifest_digest's claim set (SEC-F), so this specific tampering
+  // still passes structural validate(); inspectSkill's label must not
+  // read as more confident than "claims sealed, unverified".
+  const forged: SkillPackageFiles = {
+    ...compiled.files,
+    manifest: {
+      ...compiled.files.manifest,
+      mint: { mint_status: "minted", minted_at: new Date().toISOString(), mint_issuer: "forger" },
+      attestation_digest: "sha256:" + "f".repeat(64),
+    },
+  };
+  const bytes = packSkill(forged);
+
+  const inspected = inspectSkill(bytes);
+  assert.equal(inspected.summary.mint_status, "minted");
+  assert.match(inspected.summary.trust_label ?? "", /unverified/i);
+
+  // The deep check is unfooled: no real attestation/signature exists.
+  const trust = verifyMintTrust(bytes, "minted", {
+    allow_development_issuer: true,
+    allow_self_reported: true,
+  });
+  assert.equal(trust.ok, false);
+  assert.ok(trust.issues.some((i) => i.code === "missing_attestation"));
+});
+
 test("P0: inspect --trust TrustView without compile", () => {
   let compiled = compileRecipeToSkill(demoRecipe(), {
     approve_inferred_inputs: true,
