@@ -24,12 +24,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dot-skill/dot-skill.git",
+    "url": "https://github.com/dot-skill/skillerr.git",
     "directory": "packages/workspace"
   },
   "homepage": "https://skillerr.com",
   "bugs": {
-    "url": "https://github.com/dot-skill/dot-skill/issues"
+    "url": "https://github.com/dot-skill/skillerr/issues"
   },
   "exports": {
     ".": {

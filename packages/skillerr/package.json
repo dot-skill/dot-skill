@@ -31,12 +31,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/dot-skill/dot-skill.git",
+    "url": "https://github.com/dot-skill/skillerr.git",
     "directory": "packages/skillerr"
   },
   "homepage": "https://skillerr.com",
   "bugs": {
-    "url": "https://github.com/dot-skill/dot-skill/issues"
+    "url": "https://github.com/dot-skill/skillerr/issues"
   },
   "engines": {
     "node": ">=20"

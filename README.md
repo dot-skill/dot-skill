@@ -8,7 +8,7 @@
 
 Open protocol and portable **`.skill`** format for AI skills — built so your **AI agent** can create, inspect, hand off, and run skills. You install once; then you talk to your AI.
 
-**Site:** [skillerr.com](https://skillerr.com) · **Artifact:** `.skill` (sealed ZIP) · **Reference CLI:** [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill`) · **Repo:** [dot-skill/dot-skill](https://github.com/dot-skill/dot-skill)
+**Site:** [skillerr.com](https://skillerr.com) · **Artifact:** `.skill` (sealed ZIP) · **Reference CLI:** [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill`) · **Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr)
 
 [![npm](https://img.shields.io/npm/v/skillerr.svg)](https://www.npmjs.com/package/skillerr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
