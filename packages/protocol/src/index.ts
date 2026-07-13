@@ -1,4 +1,4 @@
-/** Open .skill Protocol v0.4 — types, constants, and schemas. */
+/** Open .skill Protocol v0.5 — types, constants, authoring APIs, and schemas. */
 
 export {
   PROTOCOL_VERSION,
@@ -16,6 +16,9 @@ export type {
   MintStatus,
   PermanenceAnchorKind,
   TrustProfile,
+  TrustState,
+  HostClaimBinding,
+  IssuerClass,
   InputSource,
   SensitivityLevel,
   AskWhen,
@@ -41,7 +44,9 @@ export type {
   SkillPolicy,
   SkillDependency,
   MintRecord,
+  SealedManifestClaims,
   CreationAttestation,
+  TrustView,
   PermanenceAnchor,
   SkillManifest,
   KnowledgeItem,
@@ -71,8 +76,61 @@ export type {
 
 export {
   FORBIDDEN_AGENT_HOSTS,
+  AGENT_RUNTIME_MARKER_ENVS,
   isValidAgentHost,
+  detectAgentRuntimeMarkers,
+  hasAgentRuntimeEvidence,
 } from "./source.js";
+
+export {
+  assessSkillContract,
+  scaffoldSkillContract,
+  explainContractAssessment,
+} from "./authoring.js";
+
+export {
+  extractSkillCandidates,
+  segmentJourney,
+  agentCreateGuide,
+  formatAgentGuide,
+  assessExtractionScaffold,
+} from "./extract.js";
+
+export type {
+  JourneyCandidateInput,
+  RedactedJourneyInput,
+  ExtractionScaffold,
+  ExtractionReport,
+  AgentGuide,
+} from "./extract.js";
+
+export type {
+  SkillKind,
+  DeclarationStatus,
+  ExplicitDeclaration,
+  ContractTrigger,
+  InputApproval,
+  ContractInput,
+  ContractPrecondition,
+  ContractStepKind,
+  ContractStep,
+  ContractBranch,
+  ContractHumanDecision,
+  ContractCapability,
+  ContractPermission,
+  ForbiddenAction,
+  ContractOutput,
+  RecoveryEdge,
+  VerificationAssertion,
+  ContractCorrection,
+  ContractEvidence,
+  ContractProvenance,
+  SkillContract,
+  ContractField,
+  ContractIssue,
+  ContractAssessment,
+  SkillCandidate,
+} from "./contract.js";
 
 export type {
   SectionType,

@@ -5,7 +5,9 @@ import type {
   CapabilityRequirement,
   InputSlot,
   RuntimeMode,
+  SideEffectClass,
   SkillPackageFiles,
+  SkillPermission,
   SkillRun,
   SkillStepRecord,
   TrustProfile,
@@ -13,6 +15,7 @@ import type {
 } from "@dot-skill/protocol";
 import {
   inspectSkill,
+  inspectTrustView,
   unpackSkill,
   validatePackageBytes,
   verifyMintTrust,
@@ -34,7 +37,18 @@ export interface RuntimeHost {
     title: string;
     permissions: string[];
     steps: string[];
-  }) => Promise<boolean>;
+  }) => Promise<{ allowed: boolean; actor: string; at: string }>;
+  decide?: (decision: {
+    id: string;
+    prompt: string;
+    choices?: string[];
+  }) => Promise<{ decision: string; actor: string; at: string }>;
+  verifyAssertion?: (assertion: {
+    id: string;
+    assertion: string;
+    check: "runtime" | "capability" | "human" | "agent";
+    evidence?: string[];
+  }) => Promise<{ passed: boolean; detail?: string }>;
   resolveSecret?: (ref: string) => Promise<string>;
   env?: Record<string, string>;
   adapters?: CapabilityAdapter[];
@@ -51,6 +65,13 @@ export interface RunOptions {
   trust_profile?: TrustProfile;
   /** Reference verifier only; production runtimes should use a real trust store. */
   issuer_secret?: string;
+  /**
+   * Explicit unsafe opt-in to execute unsigned / development / self_reported packages.
+   * Required for execute when TrustView is not verified_issuer.
+   */
+  allow_untrusted?: boolean;
+  /** Allow public-dev HMAC seals for local testing only. */
+  allow_development_issuer?: boolean;
 }
 
 function loadRuntimeIdentity(): { name: string; version: string } {
@@ -64,6 +85,125 @@ function loadRuntimeIdentity(): { name: string; version: string } {
 }
 
 const { name: RUNTIME_NAME, version: RUNTIME_VERSION } = loadRuntimeIdentity();
+
+function permissionCovers(
+  permissions: SkillPermission[],
+  sideEffect: SideEffectClass,
+): SkillPermission | undefined {
+  return permissions.find((p) => p.side_effect_class === sideEffect);
+}
+
+/**
+ * Deny-by-default: refuse undeclared network / filesystem / secret adapter use.
+ * Fail closed when consent is required but missing.
+ */
+export function assertCapabilityAllowed(
+  pkg: SkillPackageFiles,
+  cap: CapabilityRequirement,
+  args: Record<string, unknown> = {},
+): void {
+  const policy = pkg.manifest.policy;
+  const side = cap.side_effect_class;
+
+  if (side === "network") {
+    if (!policy.allow_network) {
+      throw new Error(
+        `Denied: capability ${cap.name} requires network but policy.allow_network=false (deny-by-default)`,
+      );
+    }
+    const perm = permissionCovers(pkg.manifest.permissions, "network");
+    if (!perm) {
+      throw new Error(
+        `Denied: capability ${cap.name} uses network but no network permission is declared`,
+      );
+    }
+    const hostArg =
+      typeof args.host === "string"
+        ? args.host
+        : typeof args.url === "string"
+          ? args.url
+          : typeof args.endpoint === "string"
+            ? args.endpoint
+            : undefined;
+    if (perm.hosts?.length && hostArg) {
+      const ok = perm.hosts.some(
+        (h) => hostArg === h || hostArg.includes(h) || hostArg.startsWith(h),
+      );
+      if (!ok) {
+        throw new Error(
+          `Denied: network host/url not in declared permission.hosts for ${cap.name}`,
+        );
+      }
+    }
+  }
+
+  if (side === "read" || side === "write" || side === "destructive") {
+    const perm = permissionCovers(pkg.manifest.permissions, side);
+    if (!perm && side !== "read") {
+      throw new Error(
+        `Denied: capability ${cap.name} uses ${side} but no matching permission is declared`,
+      );
+    }
+    const pathArg =
+      typeof args.path === "string"
+        ? args.path
+        : typeof args.file === "string"
+          ? args.file
+          : typeof args.root === "string"
+            ? args.root
+            : undefined;
+    const roots = policy.filesystem_roots;
+    if (pathArg && roots?.length) {
+      const ok = roots.some(
+        (root) => pathArg === root || pathArg.startsWith(root.endsWith("/") ? root : `${root}/`),
+      );
+      if (!ok) {
+        throw new Error(
+          `Denied: path ${pathArg} outside policy.filesystem_roots for ${cap.name}`,
+        );
+      }
+    }
+    if (pathArg && perm?.paths?.length) {
+      const ok = perm.paths.some(
+        (p) => pathArg === p || pathArg.startsWith(p.endsWith("/") ? p : `${p}/`),
+      );
+      if (!ok) {
+        throw new Error(
+          `Denied: path ${pathArg} not in declared permission.paths for ${cap.name}`,
+        );
+      }
+    }
+  }
+
+  if (side === "none") {
+    // no side effects — allowed
+  }
+}
+
+function assertSecretAccessAllowed(
+  pkg: SkillPackageFiles,
+  slotName: string,
+): void {
+  const slot = pkg.manifest.inputs.find((i) => i.name === slotName);
+  if (!slot || (slot.sensitivity !== "secret" && slot.source !== "secret")) {
+    throw new Error(
+      `Denied: secret access for undeclared slot ${slotName} (deny-by-default)`,
+    );
+  }
+}
+
+/** Resolve a secret ref only if the input slot declares secret sensitivity/source. */
+export async function resolveDeclaredSecret(
+  pkg: SkillPackageFiles,
+  slotName: string,
+  host: RuntimeHost,
+): Promise<string> {
+  assertSecretAccessAllowed(pkg, slotName);
+  if (!host.resolveSecret) {
+    throw new Error("Denied: no resolveSecret callback (fail closed for secrets)");
+  }
+  return host.resolveSecret(slotName);
+}
 
 function substitute(template: string, inputs: Record<string, unknown>): string {
   return template.replace(/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g, (_, name: string) => {
@@ -218,16 +358,54 @@ export async function runSkillPackage(
     };
   }
 
-  const consentNeeded = pkg.manifest.permissions
-    .filter((p) => p.requires_consent)
-    .map((p) => p.side_effect_class);
-  if (mode === "execute" && consentNeeded.length && host.consent) {
-    const allowed = await host.consent({
+  const consentNeeded = new Set<string>(
+    pkg.manifest.permissions
+      .filter((p) => p.requires_consent)
+      .map((p) => p.side_effect_class),
+  );
+  for (const side of pkg.manifest.policy.consent_for ?? []) {
+    if (
+      pkg.manifest.capabilities.some((c) => c.side_effect_class === side) ||
+      pkg.manifest.permissions.some((p) => p.side_effect_class === side)
+    ) {
+      consentNeeded.add(side);
+    }
+  }
+  if (mode === "execute" && consentNeeded.size) {
+    if (!host.consent) {
+      return failRun(
+        runId,
+        pkg,
+        mode,
+        resolved,
+        secret_refs,
+        stepRecords,
+        verifications,
+        started,
+        host,
+        "Explicit permission consent required; runtime host has no authenticated consent callback (fail closed)",
+      );
+    }
+    const consent = await host.consent({
       title: pkg.manifest.title,
-      permissions: consentNeeded,
+      permissions: [...consentNeeded],
       steps: pkg.workflow.steps.map((s) => `${s.id}:${s.kind}`),
     });
-    if (!allowed) {
+    if (!consent.actor || !consent.at) {
+      return failRun(
+        runId,
+        pkg,
+        mode,
+        resolved,
+        secret_refs,
+        stepRecords,
+        verifications,
+        started,
+        host,
+        "Permission consent callback returned invalid actor/timestamp evidence",
+      );
+    }
+    if (!consent.allowed) {
       return {
         kind: "skill_run",
         id: runId,
@@ -529,6 +707,12 @@ async function executeStep(
     case "tool": {
       const cap = ctx.pkg.manifest.capabilities.find((c) => c.name === step.capability);
       if (!cap) throw new Error(`Unknown capability ${step.capability}`);
+      const args = { ...(step.arguments ?? {}) };
+      for (const [k, bind] of Object.entries(step.argument_bindings ?? {})) {
+        args[k] = ctx.inputs[bind] ?? ctx.stepOutputs[bind];
+      }
+      // Deny-by-default capability gate (even in dry_run for visibility of refusals).
+      assertCapabilityAllowed(ctx.pkg, cap, args);
       if (ctx.dry) {
         return {
           output: { dry_run: true, capability: cap.name, arguments: step.arguments },
@@ -545,10 +729,6 @@ async function executeStep(
           throw new Error(`Capability ${cap.name} requires human/tool adapter`);
         }
         throw new Error(`No adapter for capability ${cap.name}`);
-      }
-      const args = { ...(step.arguments ?? {}) };
-      for (const [k, bind] of Object.entries(step.argument_bindings ?? {})) {
-        args[k] = ctx.inputs[bind] ?? ctx.stepOutputs[bind];
       }
       const inv = await adapter.invoke(cap, args);
       if (!inv.ok) throw new Error(inv.error ?? "tool failed");
@@ -608,12 +788,20 @@ async function executeStep(
           resultAs: step.result_as,
         };
       }
-      const existing =
-        (step.result_as ? ctx.inputs[step.result_as] : undefined) ?? ctx.inputs[step.id];
-      if (existing !== undefined) {
-        return { output: existing, resultAs: step.result_as };
+      if (!ctx.host.decide) {
+        throw new Error(
+          `human_decision ${step.id} unsupported: runtime requires an authenticated decide callback; input values cannot spoof human approval`,
+        );
       }
-      throw new Error(`human_decision ${step.id} requires input`);
+      const evidence = await ctx.host.decide({
+        id: step.id,
+        prompt: step.prompt,
+        choices: step.choices,
+      });
+      if (!evidence.actor || !evidence.at || !evidence.decision) {
+        throw new Error(`human_decision ${step.id} returned invalid approval evidence`);
+      }
+      return { output: evidence, resultAs: step.result_as };
     }
     case "verify": {
       const results: SkillRun["verifications"] = [];
@@ -644,6 +832,35 @@ async function executeStep(
           const key = assertion.slice("exists:".length);
           const val = ctx.stepOutputs[key] ?? ctx.inputs[key];
           results.push({ assertion, passed: val !== undefined });
+        } else if (
+          assertion.startsWith("precondition:") ||
+          assertion.startsWith("contract_assertion:")
+        ) {
+          const id = assertion.slice(assertion.indexOf(":") + 1);
+          const definition =
+            ctx.pkg.workflow.preconditions?.status === "specified"
+              ? ctx.pkg.workflow.preconditions.items.find((item) => item.id === id)
+              : ctx.pkg.workflow.verification?.status === "specified"
+                ? ctx.pkg.workflow.verification.items.find((item) => item.id === id)
+                : undefined;
+          if (!definition) {
+            results.push({ assertion, passed: false, detail: "Contract assertion missing" });
+          } else if (!ctx.host.verifyAssertion) {
+            results.push({
+              assertion,
+              passed: false,
+              detail:
+                "Unsupported domain assertion: runtime host must provide verifyAssertion; presence is not proof",
+            });
+          } else {
+            const checked = await ctx.host.verifyAssertion({
+              id: definition.id,
+              assertion: "assertion" in definition ? definition.assertion : "",
+              check: definition.check,
+              evidence: "evidence" in definition ? definition.evidence : undefined,
+            });
+            results.push({ assertion, ...checked });
+          }
         } else {
           results.push({
             assertion,
@@ -680,7 +897,11 @@ function evalWhen(
   stepOutputs: Record<string, unknown>,
 ): boolean {
   const m = expr.match(/^input:([a-zA-Z0-9_]+)(?:==(.*))?$/);
-  if (!m) return false;
+  if (!m) {
+    throw new Error(
+      `Unsupported branch expression ${JSON.stringify(expr)}; supported form is input:name or input:name==value`,
+    );
+  }
   const val = inputs[m[1]!] ?? stepOutputs[m[1]!];
   if (m[2] === undefined) return Boolean(val);
   return String(val) === m[2];
@@ -717,6 +938,44 @@ export async function runSkillArchive(
   }
   const unpacked = unpackSkill(archive);
   const manifest = unpacked.manifest;
+  const mode = options.mode ?? "execute";
+  const trustView = inspectTrustView(archive);
+
+  // Execute refuses unsigned / development / self_reported unless explicit unsafe flag.
+  if (mode === "execute" || mode === "resume") {
+    const trusted = trustView.trust_state === "verified_issuer";
+    if (!trusted && !options.allow_untrusted) {
+      const started = new Date().toISOString();
+      return {
+        kind: "skill_run",
+        id: `run_${randomUUID().replace(/-/g, "").slice(0, 16)}`,
+        skill_id: manifest.id,
+        skill_version: manifest.version,
+        package_digest: manifest.package_digest,
+        status: "failed",
+        mode,
+        resolved_inputs: {},
+        steps: [],
+        verifications: [
+          {
+            assertion: "trust_gate",
+            passed: false,
+            detail: `${trustView.label}. Pass allow_untrusted / --allow-untrusted to execute anyway.`,
+          },
+        ],
+        runtime: {
+          name: RUNTIME_NAME,
+          version: RUNTIME_VERSION,
+          host: host.host,
+          model: host.model,
+        },
+        started_at: started,
+        finished_at: new Date().toISOString(),
+        error: `Refusing execute: ${trustView.label}`,
+      };
+    }
+  }
+
   const trustProfile: TrustProfile =
     options.trust_profile ??
     (manifest.policy.require_anchor
@@ -725,7 +984,14 @@ export async function runSkillArchive(
         ? "minted"
         : manifest.policy.trust_profile ?? "open");
   if (trustProfile !== "open") {
-    const trust = verifyMintTrust(archive, trustProfile, options.issuer_secret);
+    const nonExecute = mode === "dry_run" || mode === "inspect" || mode === "explain";
+    const trust = verifyMintTrust(archive, trustProfile, {
+      issuer_secret: options.issuer_secret,
+      allow_development_issuer:
+        options.allow_development_issuer ??
+        (options.allow_untrusted === true || nonExecute),
+      allow_self_reported: options.allow_untrusted === true || nonExecute,
+    });
     if (!trust.ok) {
       const started = new Date().toISOString();
       return {
@@ -735,7 +1001,7 @@ export async function runSkillArchive(
         skill_version: manifest.version,
         package_digest: manifest.package_digest,
         status: "failed",
-        mode: options.mode ?? "execute",
+        mode,
         resolved_inputs: {},
         steps: [],
         verifications: trust.issues.map((issue) => ({
@@ -754,8 +1020,44 @@ export async function runSkillArchive(
         error: "Package trust verification failed",
       };
     }
+  } else if ((mode === "execute" || mode === "resume") && !options.allow_untrusted) {
+    // Open profile packages are explicitly untrusted for execute.
+    const started = new Date().toISOString();
+    return {
+      kind: "skill_run",
+      id: `run_${randomUUID().replace(/-/g, "").slice(0, 16)}`,
+      skill_id: manifest.id,
+      skill_version: manifest.version,
+      package_digest: manifest.package_digest,
+      status: "failed",
+      mode,
+      resolved_inputs: {},
+      steps: [],
+      verifications: [
+        {
+          assertion: "open_untrusted",
+          passed: false,
+          detail: "Open/unsigned packages require --allow-untrusted for execute",
+        },
+      ],
+      runtime: {
+        name: RUNTIME_NAME,
+        version: RUNTIME_VERSION,
+        host: host.host,
+        model: host.model,
+      },
+      started_at: started,
+      finished_at: new Date().toISOString(),
+      error: "Refusing execute of open/untrusted package without --allow-untrusted",
+    };
   }
   return runSkillPackage(unpacked.raw, host, options);
 }
 
-export { inspectSkill, validatePackageBytes, unpackSkill, explainPackage as explain };
+export {
+  inspectSkill,
+  inspectTrustView,
+  validatePackageBytes,
+  unpackSkill,
+  explainPackage as explain,
+};

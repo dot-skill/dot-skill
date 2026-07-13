@@ -1,0 +1,50 @@
+{
+  "name": "skillerr",
+  "version": "0.5.0",
+  "description": "Easily create, inspect, and run portable .skill packages for AI agents. Bin: skill.",
+  "license": "MIT",
+  "author": {
+    "name": "Bharat Dudeja",
+    "url": "https://github.com/bharatdudeja13-cmd"
+  },
+  "keywords": [
+    "skill",
+    "skillerr",
+    "dot-skill",
+    ".skill",
+    "ai-agents",
+    "agent-skills",
+    "cli",
+    "protocol",
+    "portable",
+    "inspectable"
+  ],
+  "type": "module",
+  "bin": {
+    "skill": "./bin/skill.js",
+    "dot-skill": "./bin/skill.js"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dot-skill/dot-skill.git",
+    "directory": "packages/dot-skill"
+  },
+  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "bugs": {
+    "url": "https://github.com/dot-skill/dot-skill/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@dot-skill/cli": "^0.5.0"
+  },
+  "scripts": {
+    "prepack": "node -e \"require('fs').accessSync('bin/skill.js')\""
+  }
+}

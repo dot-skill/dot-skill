@@ -1,12 +1,21 @@
 {
   "name": "@dot-skill/runtime",
-  "version": "0.4.3",
-  "description": "Open .skill Protocol — reference workflow runtime",
+  "version": "0.5.0",
+  "description": "Inspect, dry-run, and execute portable .skill packages",
   "license": "MIT",
   "author": {
     "name": "Bharat Dudeja",
     "url": "https://github.com/bharatdudeja13-cmd"
   },
+  "keywords": [
+    "skill",
+    "dot-skill",
+    ".skill",
+    "ai-agents",
+    "agent-skills",
+    "runtime",
+    "dry-run"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,8 +27,14 @@
     "url": "https://github.com/dot-skill/dot-skill.git",
     "directory": "packages/runtime"
   },
+  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "bugs": {
+    "url": "https://github.com/dot-skill/dot-skill/issues"
+  },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "exports": {
     ".": {
@@ -33,8 +48,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dot-skill/core": "^0.4.3",
-    "@dot-skill/protocol": "^0.4.3"
+    "@dot-skill/core": "^0.5.0",
+    "@dot-skill/protocol": "^0.5.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

@@ -6,6 +6,7 @@
  */
 
 import type { GenerationUsage, JourneyProvenance, PackageSensitivity } from "./types.js";
+import type { SkillContract } from "./contract.js";
 import type {
   AgentContext,
   Attachment,
@@ -65,6 +66,8 @@ export interface Recipe {
   source_protocol_version: string;
   generation_usage?: GenerationUsage;
   journey_summary?: string;
+  /** Optional 0.5 protocol-native semantics carried through this lossy product adapter. */
+  contract?: SkillContract;
 }
 
 /** @deprecated Legacy flat markdown skill export. Prefer SkillManifest / `.skill`. */
@@ -133,6 +136,7 @@ export function recipeToSkillSource(
     title: recipe.title,
     summary: recipe.summary,
     intent: recipe.summary ?? recipe.title,
+    contract: recipe.contract ? structuredClone(recipe.contract) : undefined,
     sections,
     steering: recipe.steering,
     prompts: recipe.prompts,

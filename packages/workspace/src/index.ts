@@ -79,7 +79,8 @@ export function requireAgentHost(host?: string): string {
   const h = host ?? process.env.SKILL_HOST;
   if (!isValidAgentHost(h)) {
     throw new Error(
-      "AI agent provenance required. Set SKILL_HOST=cursor|ollama|lmstudio|llama-cpp|custom-agent|… (local models are supported).",
+      "AI agent provenance required. Set SKILL_HOST=cursor|ollama|lmstudio|llama-cpp|custom-agent|… " +
+        "(not human/cli/shell/manual). Env alone never yields verified_issuer trust.",
     );
   }
   return h!;

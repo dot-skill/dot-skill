@@ -5,6 +5,8 @@ import type {
   CompilationIssue,
   CompilationMapping,
   CompilationReport,
+  ContractAssessment,
+  ContractStep,
   GenerationUsage,
   InputSlot,
   KnowledgeItem,
@@ -22,6 +24,7 @@ import {
   CONTAINER_VERSION,
   PROTOCOL_VERSION,
   WORKFLOW_DIALECT_VERSION,
+  assessSkillContract,
   isValidAgentHost,
   recipeToSkillSource,
 } from "@dot-skill/protocol";
@@ -149,7 +152,7 @@ export interface CompileResult {
   completeness: CompletenessReport;
 }
 
-const HINTS: Record<CompletenessPart, string> = {
+const HINTS: Partial<Record<CompletenessPart, string>> = {
   agent_context:
     "Set SKILL_HOST to an AI host (cursor, ollama, lmstudio, llama-cpp, custom-agent, …). This is asserted provenance, not cryptographic proof.",
   intent: "Add an intent/summary section describing what this skill is for.",
@@ -229,7 +232,7 @@ export function assessCompleteness(
     complete: requiredMissing.length === 0,
     present,
     missing: requiredMissing,
-    hints: requiredMissing.map((m) => HINTS[m]),
+    hints: requiredMissing.map((m) => HINTS[m] ?? `Complete the ${m} declaration.`),
   };
 }
 
@@ -241,11 +244,409 @@ function sectionHasWorkflowAction(sections: SkillSection[]): boolean {
   );
 }
 
+function declaredItems<T>(declaration: { status: string; items?: T[] } | undefined): T[] {
+  if (!declaration) return [];
+  return declaration.status === "specified" ? declaration.items ?? [] : [];
+}
+
+function contractCompleteness(
+  assessment: ContractAssessment,
+  profile: SkillCompileProfile,
+): CompletenessReport {
+  const missing = [...new Set(
+    assessment.issues.map((issue) => {
+      const root = issue.field.split(".")[0]!;
+      return (root === "contract" ? "semantic_contract" : root) as CompletenessPart;
+    }),
+  )];
+  const contractParts: CompletenessPart[] = [
+    "semantic_contract",
+    "intent",
+    "triggers",
+    "inputs",
+    "preconditions",
+    "steps",
+    "branches",
+    "human_decisions",
+    "capabilities",
+    "permissions",
+    "forbidden_actions",
+    "outputs",
+    "recovery",
+    "verification",
+    "corrections",
+    "provenance",
+  ];
+  return {
+    kind: "completeness_report",
+    profile,
+    complete: assessment.complete,
+    present: contractParts.filter((part) => !missing.includes(part)),
+    missing,
+    hints: assessment.issues.map((issue) => `${issue.field}: ${issue.fix}`),
+  };
+}
+
+function compileContractStep(step: ContractStep): WorkflowStep {
+  const base = {
+    id: step.id,
+    title: step.title,
+    optional: step.optional,
+    next: step.next,
+    on_fail: step.on_failure,
+  };
+  switch (step.kind) {
+    case "instruct":
+      return { ...base, kind: "instruct", text: step.instruction ?? "" };
+    case "prompt":
+      return { ...base, kind: "prompt", template: step.instruction ?? "" };
+    case "tool":
+      return {
+        ...base,
+        kind: "tool",
+        capability: step.capability ?? "",
+        arguments: step.arguments,
+        argument_bindings: step.argument_bindings,
+        result_as: step.result_as,
+      };
+    case "transform":
+      return {
+        ...base,
+        kind: "transform",
+        expression: step.instruction ?? "identity",
+        result_as: step.result_as,
+      };
+    case "checkpoint":
+      return { ...base, kind: "checkpoint", message: step.instruction };
+    case "human_decision":
+      return {
+        ...base,
+        kind: "human_decision",
+        prompt: step.instruction ?? step.decision ?? step.title,
+        result_as: step.result_as,
+      };
+    case "verify":
+      return { ...base, kind: "verify", assertions: step.assertions ?? [] };
+    case "emit":
+      return {
+        ...base,
+        kind: "emit",
+        output: step.output ?? "",
+        from: step.from ?? "",
+      };
+  }
+}
+
+function compileNativeContract(
+  source: SkillSource,
+  opts: CompileOptions,
+  profile: SkillCompileProfile,
+): CompileResult {
+  const contract = source.contract!;
+  if (!isValidAgentHost(source.agent.host) || !source.journey?.summary?.trim()) {
+    const missing: CompletenessPart[] = [];
+    const hints: string[] = [];
+    if (!isValidAgentHost(source.agent.host)) {
+      missing.push("agent_context");
+      hints.push(HINTS.agent_context!);
+    }
+    if (!source.journey?.summary?.trim()) {
+      missing.push("journey");
+      hints.push(HINTS.journey!);
+    }
+    throw new CompileRefusalError({
+      kind: "completeness_report",
+      profile,
+      complete: false,
+      present: [],
+      missing,
+      hints,
+    });
+  }
+  const assessment = assessSkillContract(contract, profile);
+  const completeness = contractCompleteness(assessment, profile);
+  if (!assessment.complete && !opts.allow_incomplete && profile === "release") {
+    throw new CompileRefusalError(completeness);
+  }
+
+  const skillId = opts.skill_id ?? shortId("skl");
+  const inputs = declaredItems(contract.inputs).map((input) => ({
+    name: input.name,
+    description: input.description,
+    schema: structuredClone(input.schema),
+    required: input.required,
+    ...(input.default !== undefined ? { default: structuredClone(input.default) } : {}),
+    sensitivity: input.sensitivity,
+    source: input.source,
+    ask_when: input.ask_when,
+    approval: input.approval,
+    // Contract review approves the slot definition; human_before_use remains a runtime gate.
+    approved: true,
+  }));
+  const outputs = declaredItems(contract.outputs).map((output) => ({
+    name: output.name,
+    description: output.description,
+    schema: structuredClone(output.schema),
+    required: output.required,
+    media_type: output.media_type,
+    assert: output.assertions,
+  }));
+  const capabilities = declaredItems(contract.capabilities).map((capability) => ({
+    ...structuredClone(capability),
+  }));
+  const permissions = declaredItems(contract.permissions).map((permission) => ({
+    side_effect_class: permission.side_effect_class,
+    description: permission.description,
+    paths: permission.paths,
+    hosts: permission.hosts,
+    requires_consent: permission.consent === "explicit_human",
+  }));
+
+  const knowledge: KnowledgeItem[] = source.sections.map((section) => ({
+    kind: "knowledge",
+    id: `k_${section.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16)}`,
+    type: knowledgeTypeFor(section),
+    title: section.title,
+    body: redactSecrets(section.body),
+    fidelity: "exact",
+    pinned: true,
+    sensitivity: section.sensitivity === "public" ? "public" : "private",
+    provenance: [{ kind: "section", id: section.id, revision: section.revision, hash: source.hash }],
+  }));
+
+  const steps = declaredItems(contract.steps).map(compileContractStep);
+  for (let i = 0; i < steps.length - 1; i++) {
+    if (!steps[i]!.next) steps[i]!.next = steps[i + 1]!.id;
+  }
+  let entrypoint = steps[0]?.id;
+
+  for (const branch of declaredItems(contract.branches)) {
+    const branchStep: WorkflowStep = {
+      id: branch.id,
+      kind: "branch",
+      title: `Conditional branch: ${branch.condition}`,
+      cases: [{ when: branch.condition, goto: branch.then }],
+      else: branch.otherwise,
+    };
+    steps.push(branchStep);
+    if (branch.after_step) {
+      const parent = steps.find((step) => step.id === branch.after_step);
+      if (parent) parent.next = branch.id;
+    }
+  }
+
+  for (const decision of declaredItems(contract.human_decisions)) {
+    const decisionStep: WorkflowStep = {
+      id: decision.id,
+      kind: "human_decision",
+      title: decision.prompt,
+      prompt: decision.prompt,
+      choices: decision.choices,
+      result_as: decision.id,
+      next: decision.required_before,
+    };
+    for (const step of steps) {
+      if (step.next === decision.required_before) step.next = decision.id;
+    }
+    if (entrypoint === decision.required_before) entrypoint = decision.id;
+    steps.push(decisionStep);
+  }
+
+  for (const input of declaredItems(contract.inputs).filter(
+    (item) => item.approval === "human_before_use",
+  )) {
+    const id = `approve_input_${slug(input.name)}`;
+    steps.push({
+      id,
+      kind: "human_decision",
+      title: `Approve input ${input.name}`,
+      prompt: `Approve use of input ${input.name}: ${input.description}`,
+      choices: ["approve", "deny"],
+      result_as: id,
+      next: entrypoint,
+    });
+    entrypoint = id;
+  }
+
+  for (const edge of declaredItems(contract.recovery)) {
+    const from = steps.find((step) => step.id === edge.from_step);
+    if (from && edge.goto) from.on_fail = edge.goto;
+  }
+
+  if (declaredItems(contract.preconditions).length) {
+    const id = "contract_preconditions";
+    steps.push({
+      id,
+      kind: "verify",
+      title: "Verify contract preconditions",
+      assertions: declaredItems(contract.preconditions).map((item) => `precondition:${item.id}`),
+      next: entrypoint,
+    });
+    entrypoint = id;
+  }
+
+  const verification = declaredItems(contract.verification);
+  if (verification.length) {
+    const id = "contract_verification";
+    const terminal = steps.find((step) => !step.next && step.id !== id);
+    if (terminal) terminal.next = id;
+    steps.push({
+      id,
+      kind: "verify",
+      title: "Verify domain assertions",
+      assertions: verification.map((item) => `contract_assertion:${item.id}`),
+    });
+    if (!entrypoint) entrypoint = id;
+  }
+
+  if (!entrypoint) {
+    const id = "contract_noop";
+    steps.push({
+      id,
+      kind: "instruct",
+      title: "No operational steps declared",
+      text: contract.intent,
+    });
+    entrypoint = id;
+  }
+
+  const constraints: SteeringConstraint[] = declaredItems(contract.forbidden_actions).map(
+    (forbidden) => ({
+      kind: "steering_constraint",
+      id: forbidden.id,
+      verb: "reject",
+      effect: "forbidden",
+      statement: forbidden.description,
+    }),
+  );
+  const report: CompilationReport = {
+    kind: "compilation_report",
+    skill_id: skillId,
+    source_id: source.id,
+    profile,
+    created_at: new Date().toISOString(),
+    mappings: [],
+    inferred_inputs: [],
+    issues: assessment.issues.map((issue) => ({
+      severity: profile === "release" ? "error" : "warning",
+      code: `contract_${issue.code}`,
+      message: `${issue.field}: ${issue.message}`,
+      related: [issue.field],
+    })),
+    pending_approvals: [],
+    approved: contract.provenance.human_review.status === "reviewed",
+    completeness,
+    semantic_contract: "native_0.5",
+  };
+  const safeJourney = {
+    ...source.journey,
+    summary: redactSecrets(source.journey.summary),
+    open_questions: source.journey.open_questions?.map(redactSecrets),
+    decisions: source.journey.decisions?.map(redactSecrets),
+    redacted: true,
+  };
+  const files: SkillPackageFiles = {
+    manifest: {
+      kind: "dot-skill",
+      id: skillId,
+      version: opts.version ?? "1.0.0",
+      title: opts.title ?? contract.title,
+      description: opts.description ?? source.summary ?? contract.intent,
+      intent: contract.intent,
+      contract: structuredClone(contract),
+      triggers: declaredItems(contract.triggers),
+      preconditions: structuredClone(contract.preconditions),
+      branches: structuredClone(contract.branches),
+      human_decisions: structuredClone(contract.human_decisions),
+      forbidden_actions: structuredClone(contract.forbidden_actions),
+      recovery: structuredClone(contract.recovery),
+      verification: structuredClone(contract.verification),
+      corrections: structuredClone(contract.corrections),
+      authors: source.actor ? [source.actor] : undefined,
+      container_version: CONTAINER_VERSION,
+      protocol_version: PROTOCOL_VERSION,
+      entrypoint,
+      inputs,
+      outputs,
+      capabilities,
+      permissions,
+      policy: { ...DEFAULT_SKILL_POLICY },
+      content: [],
+      package_digest: "sha256:" + "0".repeat(64),
+      provenance_mode: opts.provenance_mode ?? (profile === "continuity" ? "redacted" : "full"),
+      compile_profile: profile,
+      completeness,
+      package_sensitivity: contract.sensitivity,
+      mint: { mint_status: "draft" },
+      needs_human_review:
+        profile === "continuity" || contract.provenance.human_review.status !== "reviewed",
+    },
+    workflow: {
+      kind: "workflow",
+      dialect_version: WORKFLOW_DIALECT_VERSION,
+      entrypoint,
+      steps,
+      constraints,
+      preconditions: structuredClone(contract.preconditions),
+      branches: structuredClone(contract.branches),
+      human_decisions: structuredClone(contract.human_decisions),
+      recovery: structuredClone(contract.recovery),
+      verification: structuredClone(contract.verification),
+    },
+    knowledge,
+    provenance: {
+      source:
+        opts.provenance_mode === "proof_only"
+          ? undefined
+          : {
+              id: source.id,
+              hash: source.hash,
+              title: source.title,
+              contract: structuredClone(contract),
+              agent: {
+                ...source.agent,
+                endpoint: source.agent.endpoint
+                  ? redactSecrets(source.agent.endpoint)
+                  : undefined,
+              },
+              section_ids: source.sections.map((section) => `${section.id}@${section.revision}`),
+            },
+      journey: safeJourney,
+      generation_usage: opts.generation_usage ?? source.generation_usage,
+      proof: { source_id: source.id, source_hash: source.hash },
+      compilation_report: report,
+    },
+  };
+  const fileMap = buildFileMap(files);
+  files.manifest = finalizeManifest(files.manifest, fileMap);
+  const packageBytes = packSkill(files);
+  return {
+    files,
+    report,
+    packageBytes,
+    pending_approvals: [],
+    completeness,
+  };
+}
+
 export function compileSkillSource(
   source: SkillSource,
   opts: CompileOptions = {},
 ): CompileResult {
   const profile: SkillCompileProfile = opts.profile ?? "release";
+  if (source.contract) return compileNativeContract(source, opts, profile);
+  if (profile === "release") {
+    throw new CompileRefusalError({
+      kind: "completeness_report",
+      profile,
+      complete: false,
+      present: [],
+      missing: ["semantic_contract"],
+      hints: [
+        "Legacy 0.4 SkillSource/Recipe text is a lossy adapter. Add a protocol 0.5 SkillContract and assess it before release compile; use continuity only for migration.",
+      ],
+    });
+  }
   const skillId = opts.skill_id ?? shortId("skl");
   const version = opts.version ?? "1.0.0";
   const issues: CompilationIssue[] = [];
@@ -266,7 +667,7 @@ export function compileSkillSource(
     });
     completeness.missing = ["agent_context"];
     completeness.complete = false;
-    completeness.hints = [HINTS.agent_context];
+    completeness.hints = [HINTS.agent_context!];
     throw new CompileRefusalError(completeness);
   }
 
@@ -499,10 +900,16 @@ export function compileSkillSource(
     hasInputsDeclared,
     pendingApprovals: pending,
   });
-
-  if (!completeness.complete && !opts.allow_incomplete && profile === "release") {
-    throw new CompileRefusalError(completeness);
+  if (!source.contract) {
+    completeness.complete = false;
+    if (!completeness.missing.includes("semantic_contract")) {
+      completeness.missing.push("semantic_contract");
+    }
+    completeness.hints.push(
+      "Add a 0.5 SkillContract. Legacy text was retained for continuity but structured semantics are unknown.",
+    );
   }
+
   if (!completeness.complete && profile === "continuity") {
     // continuity still requires hard parts
     const hard = completeness.missing.filter((m) =>
@@ -554,6 +961,13 @@ export function compileSkillSource(
     pending_approvals: pending,
     approved: pending.length === 0,
     completeness,
+    semantic_contract: "legacy_lossy",
+    losses: [
+      "intent/triggers may be inferred from title or summary",
+      "inputs inferred from placeholders lose original schema semantics",
+      "preconditions, branches, outputs, recovery, and verification may remain prose",
+      "human review cannot be reconstructed from legacy text",
+    ],
   };
 
   const files: SkillPackageFiles = {
@@ -567,7 +981,7 @@ export function compileSkillSource(
         source.summary ??
         `Skill compiled from source ${source.id}`,
       intent: source.intent ?? source.summary,
-      triggers: [source.title],
+      triggers: [{ id: "legacy_title", description: source.title }],
       authors: source.actor ? [source.actor] : undefined,
       container_version: CONTAINER_VERSION,
       protocol_version: PROTOCOL_VERSION,
@@ -603,6 +1017,7 @@ export function compileSkillSource(
       package_sensitivity: source.sensitivity,
       mint: { mint_status: "draft" },
       needs_human_review: pending.length > 0 || profile === "continuity",
+      legacy: true,
     },
     workflow: {
       kind: "workflow",

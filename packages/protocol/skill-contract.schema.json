@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dot-skill.org/schema/0.5/skill-contract.schema.json",
+  "title": "Open .skill 0.5 authoring contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "contract_version",
+    "skill_kind",
+    "title",
+    "intent",
+    "sensitivity",
+    "triggers",
+    "inputs",
+    "preconditions",
+    "steps",
+    "branches",
+    "human_decisions",
+    "capabilities",
+    "permissions",
+    "forbidden_actions",
+    "outputs",
+    "recovery",
+    "verification",
+    "corrections",
+    "provenance"
+  ],
+  "properties": {
+    "kind": { "const": "skill_contract" },
+    "contract_version": { "const": "0.5" },
+    "skill_kind": { "enum": ["knowledge", "procedure", "integration"] },
+    "title": { "type": "string", "minLength": 1 },
+    "intent": { "type": "string", "minLength": 1 },
+    "sensitivity": { "enum": ["private", "shareable_redacted", "public"] },
+    "triggers": { "$ref": "#/$defs/declaration" },
+    "inputs": { "$ref": "#/$defs/declaration" },
+    "preconditions": { "$ref": "#/$defs/declaration" },
+    "steps": { "$ref": "#/$defs/declaration" },
+    "branches": { "$ref": "#/$defs/declaration" },
+    "human_decisions": { "$ref": "#/$defs/declaration" },
+    "capabilities": { "$ref": "#/$defs/declaration" },
+    "permissions": { "$ref": "#/$defs/declaration" },
+    "forbidden_actions": { "$ref": "#/$defs/declaration" },
+    "outputs": { "$ref": "#/$defs/declaration" },
+    "recovery": { "$ref": "#/$defs/declaration" },
+    "verification": { "$ref": "#/$defs/declaration" },
+    "corrections": { "$ref": "#/$defs/declaration" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence", "limitations", "human_review"],
+      "properties": {
+        "evidence": { "$ref": "#/$defs/declaration" },
+        "limitations": { "$ref": "#/$defs/declaration" },
+        "human_review": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status"],
+              "properties": { "status": { "const": "not_reviewed" } }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "actor", "at", "scope"],
+              "properties": {
+                "status": { "const": "reviewed" },
+                "actor": { "type": "string", "minLength": 1 },
+                "at": { "type": "string", "format": "date-time" },
+                "scope": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+                "digest": { "type": "string" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "declaration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "items"],
+          "properties": {
+            "status": { "const": "specified" },
+            "items": { "type": "array", "minItems": 1, "items": { "type": ["object", "string"] } }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "reason"],
+          "properties": {
+            "status": { "enum": ["none", "not_applicable"] },
+            "reason": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    }
+  }
+}

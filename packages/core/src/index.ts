@@ -1,6 +1,15 @@
 /** @dot-skill/core — pack, unpack, validate, mint, compile .skill packages. */
 
-export { canonicalize, sha256Hex, sha256Digest, packageDigestFromContent } from "./hash.js";
+export {
+  canonicalize,
+  sha256Hex,
+  sha256Digest,
+  packageDigestFromContent,
+  buildSealedManifestClaims,
+  sealedManifestDigest,
+  PUBLIC_DEV_MINT_KEY,
+  PUBLIC_DEV_MINT_KEY_ID,
+} from "./hash.js";
 export {
   normalizePath,
   assertSafePaths,
@@ -27,8 +36,9 @@ export {
   mintSkillPackage,
   addPermanenceAnchor,
   verifyMintTrust,
+  inspectTrustView,
 } from "./mint.js";
-export type { MintOptions } from "./mint.js";
+export type { MintOptions, VerifyMintTrustOptions } from "./mint.js";
 export {
   compileSkillSource,
   compileRecipeToSkill,

@@ -19,7 +19,7 @@
 | commit | `skill compile` (release) |
 | tag/sign | `skill mint` |
 
-No `publish` in the happy path — share the file.
+No marketplace publish in the happy path — share the `.skill` file.
 
 ## Agent path
 
@@ -31,3 +31,5 @@ skill propose --json '[…]'
 skill checkpoint                 # handoff draft
 skill compile -m "…" --approve --mint
 ```
+
+Install: `npm i -g skillerr`

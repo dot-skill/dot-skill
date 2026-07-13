@@ -1,6 +1,6 @@
-# Continuity — AI work context without private dumps
+# Continuity — work context without private dumps
 
-Developers switch models and hosts constantly. Chat exports are toxic (secrets, PII, noise). Continuity `.skill` files are the portable **source of truth for work context**.
+Developers switch models and hosts constantly. Chat exports leak secrets, PII, and noise. Continuity `.skill` files are the portable **source of truth for work context**.
 
 ## Checkpoint
 
@@ -12,13 +12,13 @@ skill checkpoint -m "auth WIP"
 # → *.skill draft (compile_profile: continuity)
 ```
 
-## Resume in another AI
+## Resume in another agent
 
 ```bash
 skill load ./skl_….skill
 ```
 
-The agent gets: intent, redacted journey, open questions, knowledge titles/bodies (scrubbed), completeness gaps, typed inputs — **not** raw transcripts or credentials.
+The agent receives: intent, redacted journey, open questions, knowledge titles/bodies (scrubbed), completeness gaps, typed inputs — **not** raw transcripts or credentials.
 
 ## Rules
 

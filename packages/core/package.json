@@ -1,12 +1,21 @@
 {
   "name": "@dot-skill/core",
-  "version": "0.4.3",
-  "description": "Open .skill Protocol — pack, validate, compile, mint",
+  "version": "0.5.0",
+  "description": "Compile, pack, validate, and mint portable .skill packages",
   "license": "MIT",
   "author": {
     "name": "Bharat Dudeja",
     "url": "https://github.com/bharatdudeja13-cmd"
   },
+  "keywords": [
+    "skill",
+    "dot-skill",
+    ".skill",
+    "ai-agents",
+    "agent-skills",
+    "compile",
+    "mint"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,8 +27,14 @@
     "url": "https://github.com/dot-skill/dot-skill.git",
     "directory": "packages/core"
   },
+  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "bugs": {
+    "url": "https://github.com/dot-skill/dot-skill/issues"
+  },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "exports": {
     ".": {
@@ -33,7 +48,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dot-skill/protocol": "^0.4.3",
+    "@dot-skill/protocol": "^0.5.0",
     "fflate": "^0.8.2"
   },
   "devDependencies": {

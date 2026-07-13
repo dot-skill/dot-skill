@@ -1,12 +1,22 @@
 {
   "name": "@dot-skill/cli",
-  "version": "0.4.3",
-  "description": "skill — Open .skill Protocol CLI (continuity and release workflows)",
+  "version": "0.5.0",
+  "description": "CLI implementation for portable .skill packages (install skillerr for the skill bin)",
   "license": "MIT",
   "author": {
     "name": "Bharat Dudeja",
     "url": "https://github.com/bharatdudeja13-cmd"
   },
+  "keywords": [
+    "skill",
+    "skillerr",
+    "dot-skill",
+    ".skill",
+    "ai-agents",
+    "agent-skills",
+    "cli",
+    "protocol"
+  ],
   "type": "module",
   "bin": {
     "skill": "./dist/cli.js",
@@ -21,9 +31,14 @@
     "url": "https://github.com/dot-skill/dot-skill.git",
     "directory": "packages/cli"
   },
+  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "bugs": {
+    "url": "https://github.com/dot-skill/dot-skill/issues"
+  },
   "files": [
     "dist/cli.js",
     "dist/cli.d.ts",
+    "README.md",
     "LICENSE"
   ],
   "scripts": {
@@ -32,11 +47,11 @@
     "test": "node --test dist/conformance.test.js"
   },
   "dependencies": {
-    "@dot-skill/core": "^0.4.3",
-    "@dot-skill/protocol": "^0.4.3",
-    "@dot-skill/registry": "^0.4.3",
-    "@dot-skill/runtime": "^0.4.3",
-    "@dot-skill/workspace": "^0.4.3"
+    "@dot-skill/core": "^0.5.0",
+    "@dot-skill/protocol": "^0.5.0",
+    "@dot-skill/registry": "^0.5.0",
+    "@dot-skill/runtime": "^0.5.0",
+    "@dot-skill/workspace": "^0.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

@@ -1,8 +1,20 @@
-/** Open .skill Protocol v0.4 — semantic types for portable `.skill` packages. */
+/** Open .skill Protocol v0.5 — semantic types for portable `.skill` packages. */
 
-export const PROTOCOL_VERSION = "0.4.0";
+import type {
+  ContractBranch,
+  ContractHumanDecision,
+  InputApproval,
+  ContractPrecondition,
+  ContractTrigger,
+  ExplicitDeclaration,
+  RecoveryEdge,
+  SkillContract,
+  VerificationAssertion,
+} from "./contract.js";
+
+export const PROTOCOL_VERSION = "0.5.0";
 export const CONTAINER_VERSION = "1.0";
-export const WORKFLOW_DIALECT_VERSION = "1.0";
+export const WORKFLOW_DIALECT_VERSION = "1.1";
 
 /** Media type for a packaged `.skill` archive (zip). */
 export const MEDIA_TYPE = "application/vnd.dot-skill+zip";
@@ -28,6 +40,24 @@ export type PermanenceAnchorKind =
   | "content_addressed_store"
   | "other";
 export type TrustProfile = "open" | "minted" | "anchored" | `issuer:${string}`;
+
+/**
+ * Human-readable trust decision for TrustView / inspect --trust.
+ * - untrusted: unsigned, open, or failed verification
+ * - development: public-dev HMAC verified structurally — never production trust
+ * - self_reported: signed, but host/model claims are env/self-asserted (not issuer-verified)
+ * - verified_issuer: configured non-public issuer key bound the sealed claims
+ */
+export type TrustState = "untrusted" | "development" | "self_reported" | "verified_issuer";
+
+/** How the host/model claim was bound into the seal. */
+export type HostClaimBinding = "self_reported" | "verified_issuer";
+
+/**
+ * Class of mint issuer key material.
+ * public_dev_hmac MUST NOT be treated as production trust.
+ */
+export type IssuerClass = "public_dev_hmac" | "configured_hmac" | "verified_issuer";
 export type InputSource = "human" | "environment" | "secret" | "artifact" | "derived";
 export type SensitivityLevel = "public" | "private" | "secret";
 export type AskWhen = "always" | "if_missing" | "never";
@@ -85,7 +115,22 @@ export type CompletenessPart =
   | "inputs_declared"
   | "journey"
   | "generation_usage"
-  | "human_approvals";
+  | "human_approvals"
+  | "semantic_contract"
+  | "triggers"
+  | "inputs"
+  | "preconditions"
+  | "steps"
+  | "branches"
+  | "human_decisions"
+  | "capabilities"
+  | "permissions"
+  | "forbidden_actions"
+  | "outputs"
+  | "recovery"
+  | "verification"
+  | "corrections"
+  | "provenance";
 
 export interface GenerationUsage {
   input_tokens?: number;
@@ -142,6 +187,7 @@ export interface InputSlot {
   default?: unknown;
   sensitivity: SensitivityLevel;
   ask_when: AskWhen;
+  approval?: InputApproval;
   examples?: unknown[];
   provenance?: ProvenanceRef[];
   generalization_reason?: string;
@@ -210,9 +256,61 @@ export interface MintRecord {
   content_id?: string;
 }
 
+/**
+ * Claims bound by the creation seal (identity + safety + content digests).
+ * Digest of this object is `sealed_manifest_digest`.
+ */
+export interface SealedManifestClaims {
+  id: string;
+  version: string;
+  title: string;
+  intent?: string;
+  description: string;
+  package_digest: string;
+  permissions: Array<{
+    side_effect_class: SideEffectClass;
+    description: string;
+    paths?: string[];
+    hosts?: string[];
+    requires_consent: boolean;
+  }>;
+  policy: {
+    require_signatures: boolean;
+    require_minted?: boolean;
+    require_anchor?: boolean;
+    allow_network: boolean;
+    filesystem_roots?: string[];
+    consent_for: SideEffectClass[];
+    trust_profile?: TrustProfile;
+    max_tool_calls: number;
+    max_runtime_ms: number;
+    fail_on_unsupported_step: boolean;
+  };
+  capabilities: Array<{
+    name: string;
+    side_effect_class: SideEffectClass;
+    required: boolean;
+  }>;
+  inputs: Array<{
+    name: string;
+    sensitivity: SensitivityLevel;
+    required: boolean;
+    source: InputSource;
+  }>;
+  content: ContentDigest[];
+  contract?: {
+    title: string;
+    intent: string;
+    skill_kind: string;
+    sensitivity: string;
+  };
+}
+
 export interface CreationAttestation {
   kind: "creation_attestation";
   package_digest: string;
+  /** Digest over identity + permissions/policy/capabilities + content index. */
+  sealed_manifest_digest: string;
   skill_id: string;
   skill_version: string;
   minted_at: string;
@@ -226,6 +324,12 @@ export interface CreationAttestation {
   model?: string;
   deployment?: "local" | "hosted" | "hybrid" | "unknown";
   endpoint?: string;
+  /** Whether host/model claims are self-asserted or issuer-verified. */
+  host_claim_binding: HostClaimBinding;
+  /** Issuer key class — public_dev_hmac is never production trust. */
+  issuer_class: IssuerClass;
+  /** Agent-runtime markers observed at mint (inspectable; still spoofable locally). */
+  agent_runtime_markers?: string[];
   journey: {
     /** @deprecated Prefer source_id — Skillerr recipe id when adapted. */
     recipe_id?: string;
@@ -242,6 +346,32 @@ export interface CreationAttestation {
     actors: string[];
   };
   policy_profile?: TrustProfile;
+}
+
+/** Seal / trust summary readable without compile or model body ingest. */
+export interface TrustView {
+  trust_state: TrustState;
+  mint_status: MintStatus;
+  signed: boolean;
+  issuer?: string;
+  issuer_class?: IssuerClass;
+  host_claim_binding?: HostClaimBinding;
+  agent?: {
+    host?: string;
+    provider?: string;
+    model?: string;
+    runtime?: string;
+    version?: string;
+    key_id?: string;
+    deployment?: string;
+    markers?: string[];
+  };
+  package_digest: string;
+  sealed_manifest_digest?: string;
+  attestation_digest?: string;
+  label: string;
+  warnings: string[];
+  issues: Array<{ severity: "error" | "warning"; code: string; message: string }>;
 }
 
 export interface PermanenceAnchor {
@@ -265,7 +395,16 @@ export interface SkillManifest {
   title: string;
   description: string;
   intent?: string;
-  triggers?: string[];
+  /** Authoritative 0.5 semantic contract. Absent only on legacy/draft adapters. */
+  contract?: SkillContract;
+  triggers?: ContractTrigger[];
+  preconditions?: ExplicitDeclaration<ContractPrecondition>;
+  branches?: ExplicitDeclaration<ContractBranch>;
+  human_decisions?: ExplicitDeclaration<ContractHumanDecision>;
+  forbidden_actions?: SkillContract["forbidden_actions"];
+  recovery?: ExplicitDeclaration<RecoveryEdge>;
+  verification?: ExplicitDeclaration<VerificationAssertion>;
+  corrections?: SkillContract["corrections"];
   authors?: Array<{ id: string; display_name?: string }>;
   license?: string;
   container_version: string;
@@ -287,6 +426,8 @@ export interface SkillManifest {
   package_sensitivity?: PackageSensitivity;
   mint?: MintRecord;
   attestation_digest?: string;
+  /** Present on minted packages — binds identity/policy/content claims in the seal. */
+  sealed_manifest_digest?: string;
   anchors?: PermanenceAnchor[];
   legacy?: boolean;
   needs_human_review?: boolean;
@@ -427,6 +568,11 @@ export interface Workflow {
   entrypoint: string;
   steps: WorkflowStep[];
   constraints?: SteeringConstraint[];
+  preconditions?: ExplicitDeclaration<ContractPrecondition>;
+  branches?: ExplicitDeclaration<ContractBranch>;
+  human_decisions?: ExplicitDeclaration<ContractHumanDecision>;
+  recovery?: ExplicitDeclaration<RecoveryEdge>;
+  verification?: ExplicitDeclaration<VerificationAssertion>;
 }
 
 export interface CompilationIssue {
@@ -456,6 +602,8 @@ export interface CompilationReport {
   pending_approvals: string[];
   approved: boolean;
   completeness: CompletenessReport;
+  semantic_contract: "native_0.5" | "legacy_lossy";
+  losses?: string[];
 }
 
 export interface SkillPackageFiles {

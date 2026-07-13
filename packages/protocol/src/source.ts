@@ -5,6 +5,7 @@
  * Adapters map those into SkillSource / SkillSection before compile.
  */
 
+import type { SkillContract, SkillCandidate } from "./contract.js";
 import type { GenerationUsage, JourneyProvenance, PackageSensitivity } from "./types.js";
 
 export type SectionType =
@@ -122,6 +123,13 @@ export interface SkillSource {
   title: string;
   summary?: string;
   intent?: string;
+  /**
+   * 0.5 source of truth for transferable semantics. A missing contract marks
+   * a 0.4-compatible text source and is release-lossy.
+   */
+  contract?: SkillContract;
+  /** Optional extraction candidates. Segmentation belongs to an adapter/AI, not the compiler. */
+  candidates?: SkillCandidate[];
   sections: SkillSection[];
   steering: SteeringEvent[];
   prompts: PromptVersion[];
@@ -140,7 +148,10 @@ export interface SkillSource {
   source_refs?: Array<{ product: string; kind: string; id: string; hash?: string }>;
 }
 
-/** Hosts that are not valid AI agent runtimes for skill creation. */
+/**
+ * Hosts that are not valid AI agent runtimes for skill creation / mint.
+ * Humans exporting SKILL_HOST=cli|shell|manual must never mint as an agent.
+ */
 export const FORBIDDEN_AGENT_HOSTS = new Set([
   "",
   "human",
@@ -148,9 +159,60 @@ export const FORBIDDEN_AGENT_HOSTS = new Set([
   "none",
   "cli",
   "user",
+  "shell",
+  "bash",
+  "zsh",
+  "sh",
+  "fish",
+  "powershell",
+  "pwsh",
+  "cmd",
+  "terminal",
+  "console",
+  "tty",
+  "stdin",
+  "keyboard",
+  "local-shell",
+  "human-cli",
+  "operator",
 ]);
 
 export function isValidAgentHost(host: string | undefined | null): boolean {
   if (!host) return false;
   return !FORBIDDEN_AGENT_HOSTS.has(host.trim().toLowerCase());
+}
+
+/**
+ * Process / mint markers that indicate an agent runtime path (not a bare human shell).
+ * These are still spoofable by a determined local process — residual risk remains —
+ * but a human who only exports SKILL_HOST=cursor without any agent context fails this check.
+ */
+export const AGENT_RUNTIME_MARKER_ENVS = [
+  "CURSOR_AGENT",
+  "CURSOR_TRACE_ID",
+  "COMPOSER_SESSION_ID",
+  "SKILL_AGENT_INVOCATION",
+  "SKILL_SESSION_ID",
+  "CLAUDE_CODE_ENTRYPOINT",
+  "AIDER_ACTIVE",
+] as const;
+
+export function detectAgentRuntimeMarkers(
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  const found: string[] = [];
+  for (const key of AGENT_RUNTIME_MARKER_ENVS) {
+    const v = env[key];
+    if (v !== undefined && String(v).trim() !== "") found.push(key);
+  }
+  return found;
+}
+
+export function hasAgentRuntimeEvidence(
+  evidence?: { markers?: string[]; session_id?: string } | null,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  if (evidence?.session_id && evidence.session_id.trim()) return true;
+  if (evidence?.markers?.some((m) => m.trim())) return true;
+  return detectAgentRuntimeMarkers(env).length > 0;
 }

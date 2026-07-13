@@ -8,7 +8,7 @@
 | Candidate | Feature-complete; breaking changes need RFC |
 | Stable | Two independent runtimes pass the same conformance corpus |
 
-**0.4.3** is **Draft**.
+**0.5.0** is **Draft**.
 
 ## Project
 
@@ -23,4 +23,5 @@ Vendor fields live under `extensions.<vendor_id>.*`.
 
 ## Neutrality
 
-Anyone may implement `.skill` under the MIT License.
+Anyone may implement `.skill` under the MIT License. The open protocol is
+independent of any particular product, marketplace, or host.

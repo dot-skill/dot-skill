@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: protocol **Draft 0.4.0**; reference packages **0.4.3**.
+Status: protocol **Draft 0.5.0**; reference packages **0.5.0**.
 
 ## Now (done in this repo)
 
@@ -11,10 +11,12 @@ Status: protocol **Draft 0.4.0**; reference packages **0.4.3**.
 - [x] Conformance tests
 - [x] Docs, governance, CI
 - [x] Local/offline agent provenance (Ollama, LM Studio, llama.cpp, custom)
+- [x] Complete transferable `SkillContract`, assessment APIs, and JSON Schema
+- [x] Structured contract-to-manifest/workflow compilation
 
 ## Next (great contribution targets)
 
-- [ ] Publish JSON Schemas under `schemas/` and validate in CI
+- [ ] Validate the published authoring schema with an independent implementation
 - [ ] Production-grade signing (replace dev HMAC; document key ceremony)
 - [ ] HTTP transparency-log server (same log format as local registry)
 - [ ] Stronger `verify` assertion language + fixtures

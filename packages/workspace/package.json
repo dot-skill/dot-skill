@@ -1,12 +1,21 @@
 {
   "name": "@dot-skill/workspace",
-  "version": "0.4.3",
-  "description": "Git-like local .skill workspace — sections, stage, compile, checkpoint, mint",
+  "version": "0.5.0",
+  "description": "Local workspace for sections, stage, compile, checkpoint, and mint",
   "license": "MIT",
   "author": {
     "name": "Bharat Dudeja",
     "url": "https://github.com/bharatdudeja13-cmd"
   },
+  "keywords": [
+    "skill",
+    "dot-skill",
+    ".skill",
+    "ai-agents",
+    "agent-skills",
+    "workspace",
+    "continuity"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,6 +27,10 @@
     "url": "https://github.com/dot-skill/dot-skill.git",
     "directory": "packages/workspace"
   },
+  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "bugs": {
+    "url": "https://github.com/dot-skill/dot-skill/issues"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -25,15 +38,17 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.json",
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@dot-skill/core": "^0.4.3",
-    "@dot-skill/protocol": "^0.4.3"
+    "@dot-skill/core": "^0.5.0",
+    "@dot-skill/protocol": "^0.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

@@ -1,0 +1,26 @@
+{
+  "kind": "redacted_journey",
+  "summary": "Human and AI designed an open .skill protocol, shipped scoped npm packages, and discussed continuity handoff versus release mint. Secrets redacted.",
+  "redacted": true,
+  "sensitivity": "shareable_redacted",
+  "candidates": [
+    {
+      "title": "Scoped npm monorepo publishing",
+      "intent": "Publish workspace packages under a scoped npm name with public access and correct pack contents.",
+      "skill_kind": "procedure",
+      "evidence_refs": ["journey:scoped-npm", "topic:publishing"]
+    },
+    {
+      "title": "Work continuity handoff",
+      "intent": "Export a continuity .skill so another agent can resume without private dumps.",
+      "skill_kind": "procedure",
+      "evidence_refs": ["journey:checkpoint-load"]
+    },
+    {
+      "title": "Missing-context compile gates",
+      "intent": "Refuse release compile when SkillContract declarations are incomplete and report field-specific fixes.",
+      "skill_kind": "knowledge",
+      "evidence_refs": ["journey:completeness"]
+    }
+  ]
+}

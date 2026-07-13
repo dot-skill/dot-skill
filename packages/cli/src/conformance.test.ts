@@ -5,9 +5,11 @@ import { test } from "node:test";
 import {
   canonicalize,
   inspectSkill,
+  inspectTrustView,
   migrateLegacySkill,
   packSkill,
   sha256Digest,
+  sealedManifestDigest,
   unpackSkill,
   validatePackageBytes,
   mintSkillPackage,
@@ -24,15 +26,130 @@ import {
   PROTOCOL_VERSION,
   WORKFLOW_DIALECT_VERSION,
   recipeToSkillSource,
+  assessSkillContract,
+  extractSkillCandidates,
   type Recipe,
+  type SkillContract,
   type SkillPackageFiles,
   type SkillSource,
 } from "@dot-skill/protocol";
-import { runSkillArchive, runSkillPackage } from "@dot-skill/runtime";
+import { assertCapabilityAllowed, runSkillArchive, runSkillPackage } from "@dot-skill/runtime";
 import { publish, lookup, list } from "@dot-skill/registry";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const demoContract = (): SkillContract => ({
+  kind: "skill_contract",
+  contract_version: "0.5",
+  skill_kind: "procedure",
+  title: "Demo integration",
+  intent: "Wire a service to a configured endpoint without exposing credentials.",
+  sensitivity: "private",
+  triggers: {
+    status: "specified",
+    items: [{ id: "ready", description: "A reviewed service integration is ready." }],
+  },
+  inputs: {
+    status: "specified",
+    items: [
+      {
+        name: "base_url",
+        description: "Service base URL",
+        schema: { type: "string", format: "uri" },
+        required: true,
+        sensitivity: "private",
+        source: "human",
+        ask_when: "if_missing",
+        approval: "none",
+      },
+      {
+        name: "api_credential_ref",
+        description: "Reference to a credential",
+        schema: { type: "string" },
+        required: true,
+        sensitivity: "secret",
+        source: "secret",
+        ask_when: "if_missing",
+        approval: "none",
+      },
+    ],
+  },
+  preconditions: { status: "none", reason: "No preconditions beyond declared inputs." },
+  steps: {
+    status: "specified",
+    items: [
+      {
+        id: "connect",
+        title: "Connect API",
+        kind: "instruct",
+        instruction: "Call {{base_url}} using {{api_credential_ref}} and retry twice on 429.",
+      },
+      {
+        id: "emit",
+        title: "Emit result",
+        kind: "emit",
+        output: "result",
+        from: "connect",
+      },
+    ],
+  },
+  branches: { status: "none", reason: "Retry behavior is contained in the instruction." },
+  human_decisions: { status: "none", reason: "This demonstration performs no irreversible action." },
+  capabilities: { status: "none", reason: "The host agent applies the instruction." },
+  permissions: { status: "none", reason: "The contract grants no side-effect permission." },
+  forbidden_actions: {
+    status: "specified",
+    items: [{ id: "no_secrets", description: "Do not hardcode secrets.", enforcement: "host" }],
+  },
+  outputs: {
+    status: "specified",
+    items: [
+      {
+        name: "result",
+        description: "Integration result",
+        schema: { type: "object" },
+        required: true,
+      },
+    ],
+  },
+  recovery: { status: "none", reason: "No external side effect is authorized." },
+  verification: {
+    status: "specified",
+    items: [
+      {
+        id: "inputs_resolved",
+        assertion: "Required endpoint and credential references are resolved.",
+        check: "runtime",
+        required: true,
+      },
+    ],
+  },
+  corrections: {
+    status: "specified",
+    items: [{ id: "retry_429", lesson: "Retry no more than twice on 429." }],
+  },
+  provenance: {
+    evidence: {
+      status: "specified",
+      items: [
+        {
+          id: "section_design",
+          kind: "section",
+          ref: "ing_1@1",
+          supports: ["intent", "steps", "verification"],
+        },
+      ],
+    },
+    limitations: { status: "none", reason: "No known semantic limitation." },
+    human_review: {
+      status: "reviewed",
+      actor: "test-human",
+      at: "2026-07-13T00:00:00.000Z",
+      scope: ["complete contract"],
+    },
+  },
+});
 
 const demoRecipe = (): Recipe => ({
   kind: "recipe",
@@ -94,6 +211,216 @@ const demoRecipe = (): Recipe => ({
     host: "cursor",
     model: "test-model",
   },
+  contract: demoContract(),
+});
+
+const npmPublishingSource = (): SkillSource => ({
+  kind: "skill_source",
+  id: "gold-scoped-npm-monorepo-publishing",
+  hash: "sha256:6869813aaee0d11115215f5691b6242e2fdd6cc0122df049ba4734df38c02c68",
+  title: "Scoped npm monorepo publishing",
+  summary: "Approved npm-publishing gold model represented as a 0.5 contract.",
+  intent: "Release a coordinated set of scoped workspace packages safely and verifiably.",
+  contract: {
+    kind: "skill_contract",
+    contract_version: "0.5",
+    skill_kind: "integration",
+    title: "Scoped npm monorepo publishing",
+    intent: "Release a coordinated set of scoped workspace packages safely and verifiably.",
+    sensitivity: "private",
+    triggers: {
+      status: "specified",
+      items: [
+        {
+          id: "reviewed_set_ready",
+          description: "A reviewed package set is ready for a coordinated npm release.",
+        },
+      ],
+    },
+    inputs: {
+      status: "specified",
+      items: [
+        {
+          name: "workspace_root",
+          description: "Monorepo workspace root",
+          schema: { type: "string", format: "directory" },
+          required: true,
+          sensitivity: "private",
+          source: "human",
+          ask_when: "if_missing",
+          approval: "none",
+        },
+        {
+          name: "registry_scope",
+          description: "Public npm scope",
+          schema: { type: "string", pattern: "^@[a-z0-9-]+$" },
+          required: true,
+          sensitivity: "public",
+          source: "human",
+          ask_when: "if_missing",
+          approval: "human_before_use",
+        },
+        {
+          name: "release_tag",
+          description: "npm distribution tag",
+          schema: { type: "string" },
+          required: false,
+          default: "latest",
+          sensitivity: "public",
+          source: "human",
+          ask_when: "if_missing",
+          approval: "none",
+        },
+      ],
+    },
+    preconditions: {
+      status: "specified",
+      items: [
+        {
+          id: "clean_and_tested",
+          assertion: "Working tree is clean and tests pass.",
+          check: "capability",
+          on_failure: "Stop before packing.",
+        },
+        {
+          id: "metadata_reviewed",
+          assertion: "Versions, public access metadata, package contents, and registry identity are reviewed.",
+          check: "human",
+          on_failure: "Request review and stop.",
+        },
+      ],
+    },
+    steps: {
+      status: "specified",
+      items: [
+        { id: "discover", title: "Discover packages", kind: "tool", capability: "workspace.read", result_as: "package_set" },
+        { id: "metadata", title: "Verify metadata", kind: "tool", capability: "workspace.read", result_as: "metadata_report" },
+        { id: "build_test", title: "Build and test cleanly", kind: "tool", capability: "commands.execute", result_as: "build_report" },
+        { id: "pack", title: "Pack and inspect tarballs", kind: "tool", capability: "commands.execute", result_as: "tarball_report" },
+        { id: "registry_check", title: "Check registry access and conflicts", kind: "tool", capability: "npm.query", result_as: "registry_preflight" },
+        { id: "release_decision", title: "Request release decision", kind: "human_decision", instruction: "Approve the package set and irreversible npm release.", result_as: "release_approval" },
+        { id: "publish", title: "Publish in dependency order", kind: "tool", capability: "npm.publish", result_as: "published_versions" },
+        { id: "verify_registry", title: "Verify registry and fresh install", kind: "tool", capability: "npm.query", result_as: "registry_report", next: "contract_verification" },
+        { id: "report_access_blocker", title: "Report access blocker", kind: "instruct", instruction: "Defer release and report the exact access blocker.", next: "contract_verification" },
+        { id: "stop_and_rebuild", title: "Stop and rebuild", kind: "instruct", instruction: "Correct tarball contents and restart verification.", next: "discover" }
+      ],
+    },
+    branches: {
+      status: "specified",
+      items: [
+        { id: "auth_blocked", after_step: "registry_check", condition: "input:registry_access==unavailable", then: "report_access_blocker", otherwise: "release_decision" },
+        { id: "private_tarball", after_step: "pack", condition: "input:tarball_safe==false", then: "stop_and_rebuild", otherwise: "registry_check" }
+      ],
+    },
+    human_decisions: {
+      status: "specified",
+      items: [
+        { id: "approve_package_set", prompt: "Approve package set and versions.", required_before: "pack", irreversible: false, approval: "explicit_human" },
+        { id: "approve_registry_release", prompt: "Approve irreversible registry release.", required_before: "publish", irreversible: true, approval: "explicit_human" }
+      ],
+    },
+    capabilities: {
+      status: "specified",
+      items: [
+        { name: "workspace.read", description: "Read workspace and package metadata.", side_effect_class: "read", fallback: "fail", required: true },
+        { name: "commands.execute", description: "Execute build, test, pack, and clean installation.", side_effect_class: "exec", fallback: "fail", required: true },
+        { name: "npm.query", description: "Query npm registry metadata.", side_effect_class: "network", fallback: "fail", required: true },
+        { name: "npm.publish", description: "Publish only after explicit authorization.", side_effect_class: "destructive", fallback: "fail", required: true }
+      ],
+    },
+    permissions: {
+      status: "specified",
+      items: [
+        { id: "read_workspace", side_effect_class: "read", description: "Read selected workspace and tarball manifests.", paths: ["{{workspace_root}}"], consent: "none" },
+        { id: "write_outputs", side_effect_class: "write", description: "Write build outputs, tarballs, and reports in the workspace.", paths: ["{{workspace_root}}"], consent: "explicit_human" },
+        { id: "execute_commands", side_effect_class: "exec", description: "Execute reviewed package-manager commands.", consent: "explicit_human" },
+        { id: "registry_network", side_effect_class: "network", description: "Query npm; publication requires its own decision.", hosts: ["registry.npmjs.org"], consent: "explicit_human" }
+      ],
+    },
+    forbidden_actions: {
+      status: "specified",
+      items: [
+        { id: "no_credentials", description: "Do not embed or print credentials.", enforcement: "host" },
+        { id: "no_dry_publish", description: "Do not publish during inspection, dry-run, or continuity execution.", enforcement: "runtime" },
+        { id: "no_inferred_approval", description: "Do not infer human approval from compiler completeness.", enforcement: "runtime" },
+        { id: "stop_on_failure", description: "Do not continue after dependency, version, tarball, or metadata failure.", enforcement: "runtime" }
+      ],
+    },
+    outputs: {
+      status: "specified",
+      items: [
+        { name: "tarball_report", description: "Tarball inspection report.", schema: { type: "object" }, required: true },
+        { name: "registry_report", description: "Registry verification report.", schema: { type: "object" }, required: true },
+        { name: "published_versions", description: "Versions released only when approved.", schema: { type: "array", items: { type: "string" } }, required: false }
+      ],
+    },
+    recovery: {
+      status: "specified",
+      items: [
+        { id: "first_failure", from_step: "publish", condition: "Any verification fails", action: "Stop and record the exact package boundary.", terminal: true },
+        { id: "nothing_published", from_step: "publish", condition: "Nothing was published", action: "Correct the issue and restart all checks.", goto: "discover" },
+        { id: "partial_publish", from_step: "publish", condition: "Publication was partial", action: "Inventory immutable versions before reviewed roll-forward.", goto: "verify_registry" },
+        { id: "version_exists", from_step: "publish", condition: "A registry version exists", action: "Choose reviewed replacement versions; never overwrite.", terminal: true }
+      ],
+    },
+    verification: {
+      status: "specified",
+      items: [
+        { id: "tarballs_resolve", assertion: "All first-party packages resolve from registry tarballs.", check: "capability", evidence: ["registry_report"], required: true },
+        { id: "fresh_install", assertion: "Fresh installation reports intended exact versions.", check: "capability", evidence: ["registry_report"], required: true },
+        { id: "no_private_files", assertion: "No package contains private files or credentials.", check: "capability", evidence: ["tarball_report"], required: true }
+      ],
+    },
+    corrections: {
+      status: "specified",
+      items: [
+        { id: "auth_stop", lesson: "Authentication or scope denial stops publication without credential improvisation." },
+        { id: "clean_rebuild", lesson: "Private or stale tarballs require clean rebuild and full reinspection." },
+        { id: "dependency_stop", lesson: "Dependency-order failure stops downstream publication." },
+        { id: "partial_inventory", lesson: "Partial publication requires immutable-version inventory before recovery." },
+        { id: "githead_match", lesson: "Registry gitHead and metadata must match reviewed source." },
+        { id: "version_drift", lesson: "Workspace version drift blocks publication." },
+        { id: "consumer_install", lesson: "A clean npm consumer installation is required before success." }
+      ],
+    },
+    provenance: {
+      evidence: {
+        status: "specified",
+        items: [
+          { id: "ev-000161", kind: "source", ref: "ev-000161", supports: ["steps", "permissions"] },
+          { id: "ev-000169", kind: "source", ref: "ev-000169", supports: ["recovery", "verification"] },
+          { id: "ev-000176", kind: "review", ref: "ev-000176", supports: ["complete contract"] }
+        ],
+      },
+      limitations: {
+        status: "specified",
+        items: ["The restricted source cannot be independently reproduced from redacted evidence."],
+      },
+      human_review: {
+        status: "reviewed",
+        actor: "acceptance-reviewer",
+        at: "2026-07-13T00:00:00.000Z",
+        scope: ["semantic baseline", "typed inputs", "release compilation"],
+        digest: "sha256:6869813aaee0d11115215f5691b6242e2fdd6cc0122df049ba4734df38c02c68",
+      },
+    },
+  },
+  sections: [],
+  steering: [],
+  prompts: [],
+  code_refs: [],
+  parents: [],
+  agent: { host: "cursor", provider: "test", model: "fixture", deployment: "local" },
+  journey: {
+    summary: "Human-approved npm publishing semantics compiled from the reviewed gold model.",
+    redacted: true,
+    sensitivity: "private",
+  },
+  inputs_declared: "none",
+  sensitivity: "private",
+  created_at: "2026-07-13T00:00:00.000Z",
+  actor: { id: "acceptance-reviewer" },
+  source_protocol_version: "0.5.0",
 });
 
 function packageIdentity(relativeUrl: string): { name: string; version: string } {
@@ -111,6 +438,113 @@ test("CLI version comes from its package metadata", () => {
     { encoding: "utf8" },
   );
   assert.equal(output, `${cli.version}\n`);
+});
+
+test("CLI exposes machine-readable contract template and field assessment", () => {
+  const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+  const template = JSON.parse(
+    execFileSync(process.execPath, [cliPath, "contract-template"], { encoding: "utf8" }),
+  ) as { kind: string; contract_version: string };
+  assert.equal(template.kind, "skill_contract");
+  assert.equal(template.contract_version, "0.5");
+
+  const sourcePath = fileURLToPath(
+    new URL("../../../examples/contract-foundation/source.json", import.meta.url),
+  );
+  const checked = JSON.parse(
+    execFileSync(process.execPath, [cliPath, "contract-check", sourcePath], {
+      encoding: "utf8",
+    }),
+  ) as { assessment: { complete: boolean }; explanation: { fixes: unknown[] } };
+  assert.equal(checked.assessment.complete, true);
+  assert.deepEqual(checked.explanation.fixes, []);
+});
+
+test("CLI agent-guide and extract emit multi-skill scaffolds with incompleteness", () => {
+  const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+  const guideText = execFileSync(process.execPath, [cliPath, "agent-guide"], {
+    encoding: "utf8",
+  });
+  assert.match(guideText, /Identify → propose multiple skills/);
+  assert.match(guideText, /skill extract/);
+  assert.match(guideText, /One skill workspace per candidate/);
+
+  const guideJson = JSON.parse(
+    execFileSync(process.execPath, [cliPath, "agent-guide", "--json"], {
+      encoding: "utf8",
+    }),
+  ) as { kind: string; identify_multiple_skills: string[]; refuse: string[] };
+  assert.equal(guideJson.kind, "skill_agent_guide");
+  assert.ok(guideJson.identify_multiple_skills.length >= 4);
+  assert.ok(guideJson.refuse.some((r) => /incomplete/i.test(r)));
+
+  const journeyPath = fileURLToPath(
+    new URL("../../../examples/multi-skill-extract/journey.json", import.meta.url),
+  );
+  const outDir = join(tmpdir(), `dot-skill-extract-${Date.now()}`);
+  let extractOut = "";
+  let exitCode = 0;
+  try {
+    extractOut = execFileSync(
+      process.execPath,
+      [cliPath, "extract", journeyPath, "-o", outDir],
+      { encoding: "utf8" },
+    );
+  } catch (err) {
+    const e = err as { status?: number; stdout?: string };
+    exitCode = e.status ?? 1;
+    extractOut = e.stdout ?? "";
+  }
+  assert.equal(exitCode, 2, "fresh scaffolds must fail completeness (exit 2)");
+  const report = JSON.parse(extractOut) as {
+    ok: boolean;
+    kind: string;
+    candidate_count: number;
+    scaffolds: Array<{
+      workspace_slug: string;
+      missing: unknown[];
+      candidate: { assessment: { complete: boolean } };
+    }>;
+    protocol: { one_workspace_per_skill: boolean; refuse_release_if_incomplete: boolean };
+  };
+  assert.equal(report.ok, true);
+  assert.equal(report.kind, "skill_extraction");
+  assert.equal(report.candidate_count, 3);
+  assert.equal(report.protocol.one_workspace_per_skill, true);
+  assert.equal(report.protocol.refuse_release_if_incomplete, true);
+  assert.ok(report.scaffolds.every((s) => s.candidate.assessment.complete === false));
+  assert.ok(report.scaffolds.every((s) => s.missing.length > 0));
+
+  const assessmentPath = join(
+    outDir,
+    "candidates",
+    "scoped-npm-monorepo-publishing",
+    "assessment.json",
+  );
+  const written = JSON.parse(readFileSync(assessmentPath, "utf8")) as {
+    missing: unknown[];
+  };
+  assert.ok(written.missing.length > 0);
+
+  // segment is an alias
+  let segmentCode = 0;
+  try {
+    execFileSync(process.execPath, [cliPath, "segment", journeyPath], { encoding: "utf8" });
+  } catch (err) {
+    segmentCode = (err as { status?: number }).status ?? 1;
+  }
+  assert.equal(segmentCode, 2);
+});
+
+test("extract refuses journey without candidates", () => {
+  assert.throws(
+    () =>
+      extractSkillCandidates({
+        summary: "Redacted work with no topics listed.",
+        redacted: true,
+      }),
+    /No skill candidates/,
+  );
 });
 
 test("canonicalize sorts object keys", () => {
@@ -239,8 +673,10 @@ test("release compile refuses when incomplete (no journey)", () => {
 
 test("recipe/source compile produces traceable skill and runtime dry_run", async () => {
   const recipe = demoRecipe();
+  const unreviewed = structuredClone(recipe);
+  unreviewed.contract!.provenance.human_review = { status: "not_reviewed" };
   assert.throws(() =>
-    compileRecipeToSkill(recipe, {
+    compileRecipeToSkill(unreviewed, {
       approve_inferred_inputs: false,
       host: "cursor",
       profile: "release",
@@ -261,7 +697,10 @@ test("recipe/source compile produces traceable skill and runtime dry_run", async
 
   const run = await runSkillPackage(
     compiled.files,
-    { host: "cursor" },
+    {
+      host: "cursor",
+      verifyAssertion: async () => ({ passed: true, detail: "test fixture verification" }),
+    },
     {
       mode: "dry_run",
       inputs: { base_url: "https://example.com", api_credential_ref: "secret:local" },
@@ -274,11 +713,158 @@ test("recipe/source compile produces traceable skill and runtime dry_run", async
   assert.equal(run.runtime.version, packageIdentity("../../runtime/package.json").version);
 });
 
+test("0.5 approved npm gold model retains structured semantics through package round-trip", () => {
+  const source = npmPublishingSource();
+  const assessment = assessSkillContract(source.contract, "release");
+  assert.equal(assessment.complete, true, JSON.stringify(assessment.issues));
+  const compiled = compileSkillSource(source, { profile: "release" });
+  assert.equal(compiled.report.semantic_contract, "native_0.5");
+  assert.equal(compiled.completeness.complete, true);
+  const unpacked = unpackSkill(compiled.packageBytes);
+  assert.deepEqual(unpacked.manifest.contract, source.contract);
+  assert.deepEqual(unpacked.manifest.inputs[0]!.schema, {
+    type: "string",
+    format: "directory",
+  });
+  assert.equal(unpacked.manifest.inputs[2]!.required, false);
+  assert.equal(unpacked.manifest.inputs[2]!.default, "latest");
+  assert.equal(unpacked.manifest.inputs[1]!.sensitivity, "public");
+  assert.equal(unpacked.manifest.inputs[1]!.approval, "human_before_use");
+  assert.equal(unpacked.workflow.preconditions?.status, "specified");
+  assert.equal(unpacked.workflow.branches?.status, "specified");
+  assert.equal(unpacked.workflow.recovery?.status, "specified");
+  assert.equal(unpacked.workflow.verification?.status, "specified");
+  assert.ok(unpacked.workflow.steps.some((step) => step.kind === "branch"));
+  assert.ok(unpacked.workflow.steps.some((step) => step.kind === "human_decision"));
+  assert.equal(validatePackageBytes(compiled.packageBytes).ok, true);
+});
+
+test("release distinguishes explicit none from ambiguous omission", () => {
+  const source = recipeToSkillSource(demoRecipe());
+  assert.equal(source.contract?.capabilities.status, "none");
+  assert.equal(source.contract?.permissions.status, "none");
+  assert.doesNotThrow(() => compileSkillSource(source, { profile: "release" }));
+
+  const omitted = structuredClone(source);
+  delete (omitted.contract as Partial<SkillContract>).permissions;
+  assert.throws(
+    () => compileSkillSource(omitted, { profile: "release" }),
+    (error: unknown) =>
+      error instanceof CompileRefusalError &&
+      error.hints.some((hint) => hint.startsWith("permissions:")),
+  );
+});
+
+test("release refuses every ambiguously omitted contract declaration with a field fix", () => {
+  const fields = [
+    "title",
+    "intent",
+    "skill_kind",
+    "sensitivity",
+    "triggers",
+    "inputs",
+    "preconditions",
+    "steps",
+    "branches",
+    "human_decisions",
+    "capabilities",
+    "permissions",
+    "forbidden_actions",
+    "outputs",
+    "recovery",
+    "verification",
+    "corrections",
+  ] as const;
+  for (const field of fields) {
+    const source = npmPublishingSource();
+    delete (source.contract as unknown as Record<string, unknown>)[field];
+    assert.throws(
+      () => compileSkillSource(source, { profile: "release" }),
+      (error: unknown) =>
+        error instanceof CompileRefusalError &&
+        error.hints.some((hint) => hint.startsWith(`${field}:`)),
+      field,
+    );
+  }
+  for (const field of ["evidence", "limitations", "human_review"] as const) {
+    const source = npmPublishingSource();
+    delete (source.contract!.provenance as unknown as Record<string, unknown>)[field];
+    assert.throws(
+      () => compileSkillSource(source, { profile: "release" }),
+      (error: unknown) =>
+        error instanceof CompileRefusalError &&
+        error.hints.some((hint) => hint.startsWith(`provenance.${field}:`)),
+      `provenance.${field}`,
+    );
+  }
+});
+
+test("runtime does not accept input values as human approval", async () => {
+  const source = recipeToSkillSource(demoRecipe());
+  source.contract!.human_decisions = {
+    status: "specified",
+    items: [
+      {
+        id: "approve_connect",
+        prompt: "Approve connection",
+        required_before: "connect",
+        irreversible: false,
+        approval: "explicit_human",
+      },
+    ],
+  };
+  const compiled = compileSkillSource(source, { profile: "release" });
+  const run = await runSkillPackage(
+    compiled.files,
+    {
+      host: "cursor",
+      verifyAssertion: async () => ({ passed: true }),
+    },
+    {
+      mode: "execute",
+      inputs: {
+        base_url: "https://example.test",
+        api_credential_ref: "secret:local",
+        approve_connect: "approve",
+      },
+    },
+  );
+  assert.equal(run.status, "failed");
+  assert.match(run.error ?? "", /authenticated decide callback|cannot spoof human approval/i);
+});
+
+test("legacy text sources are continuity-only and continuity reports actionable contract gaps", () => {
+  const legacyRecipe = demoRecipe();
+  delete legacyRecipe.contract;
+  assert.throws(
+    () => compileRecipeToSkill(legacyRecipe, { profile: "release", host: "cursor" }),
+    (error: unknown) =>
+      error instanceof CompileRefusalError && error.missing.includes("semantic_contract"),
+  );
+  const continuity = compileRecipeToSkill(legacyRecipe, {
+    profile: "continuity",
+    host: "cursor",
+    approve_inferred_inputs: true,
+  });
+  assert.equal(continuity.report.semantic_contract, "legacy_lossy");
+  assert.equal(continuity.completeness.complete, false);
+  assert.ok(continuity.completeness.missing.includes("semantic_contract"));
+  assert.ok(continuity.report.losses?.length);
+});
+
+test("continuity compiles a partial native contract and returns field-specific fixes", () => {
+  const source = npmPublishingSource();
+  delete (source.contract as unknown as Record<string, unknown>).outputs;
+  const compiled = compileSkillSource(source, { profile: "continuity" });
+  assert.equal(compiled.completeness.complete, false);
+  assert.ok(compiled.completeness.hints.some((hint) => hint.startsWith("outputs:")));
+});
+
 test("digest helper", () => {
   assert.match(sha256Digest("abc"), /^sha256:[a-f0-9]{64}$/);
 });
 
-test("mint seals package and verify-trust accepts minted profile", () => {
+test("mint seals package and verify-trust accepts development profile with explicit opt-in", () => {
   const recipe = demoRecipe();
   recipe.id = "rcp_mint";
   let compiled = compileRecipeToSkill(recipe, {
@@ -297,15 +883,31 @@ test("mint seals package and verify-trust accepts minted profile", () => {
   assert.ok(files.attestation?.generation_usage?.total_tokens === 1600);
   assert.equal(attestation.agent.runtime, packageIdentity("../../core/package.json").name);
   assert.equal(attestation.agent.version, packageIdentity("../../core/package.json").version);
-  const trust = verifyMintTrust(packageBytes, "minted");
+  assert.equal(attestation.issuer_class, "public_dev_hmac");
+  assert.equal(attestation.host_claim_binding, "self_reported");
+  assert.ok(attestation.sealed_manifest_digest);
+  assert.equal(attestation.sealed_manifest_digest, sealedManifestDigest(files.manifest));
+  // Public-dev HMAC must NOT verify as production trust by default.
+  assert.equal(verifyMintTrust(packageBytes, "minted").ok, false);
+  const trust = verifyMintTrust(packageBytes, "minted", {
+    allow_development_issuer: true,
+    allow_self_reported: true,
+  });
   assert.equal(trust.ok, true, JSON.stringify(trust.issues));
+  assert.equal(trust.trust_state, "development");
   const anchored = addPermanenceAnchor(packageBytes, {
     kind: "ledger",
     located_at: "ledger:example/tx/1",
     anchored_at: new Date().toISOString(),
     issuer: "test",
   });
-  assert.equal(verifyMintTrust(anchored, "anchored").ok, true);
+  assert.equal(
+    verifyMintTrust(anchored, "anchored", {
+      allow_development_issuer: true,
+      allow_self_reported: true,
+    }).ok,
+    true,
+  );
 });
 
 test("cannot mint with reserved non-agent host", () => {
@@ -317,7 +919,10 @@ test("cannot mint with reserved non-agent host", () => {
   });
   compiled = approveCompilation(compiled, { inputs: ["*"], permissions: true });
   compiled.files.manifest.needs_human_review = false;
-  assert.throws(() => mintSkillPackage(compiled.files, { host: "cli" }), /not a valid AI/);
+  assert.throws(() => mintSkillPackage(compiled.files, { host: "cli" }), /not a valid AI|denylisted/);
+  assert.throws(() => mintSkillPackage(compiled.files, { host: "shell" }), /not a valid AI|denylisted/);
+  assert.throws(() => mintSkillPackage(compiled.files, { host: "manual" }), /not a valid AI|denylisted/);
+  assert.throws(() => mintSkillPackage(compiled.files, { host: "human" }), /not a valid AI|denylisted/);
 });
 
 test("local Ollama agent can compile and mint offline provenance", () => {
@@ -349,7 +954,14 @@ test("local Ollama agent can compile and mint offline provenance", () => {
   assert.equal(minted.attestation.host, "ollama");
   assert.equal(minted.attestation.provider, "ollama");
   assert.equal(minted.attestation.deployment, "local");
-  assert.equal(verifyMintTrust(minted.packageBytes, "minted").ok, true);
+  assert.equal(minted.attestation.issuer_class, "public_dev_hmac");
+  assert.equal(
+    verifyMintTrust(minted.packageBytes, "minted", {
+      allow_development_issuer: true,
+      allow_self_reported: true,
+    }).ok,
+    true,
+  );
 });
 
 test("mint refuses a relabeled continuity draft", () => {
@@ -430,7 +1042,7 @@ test("registry local log publish and lookup", async () => {
   assert.equal(entries.length, 1);
 });
 
-test("workspace continuity checkpoint + release compile --mint", async () => {
+test("workspace legacy sections checkpoint for continuity but refuse release", async () => {
   const { mkdtempSync } = await import("node:fs");
   const dir = mkdtempSync(join(tmpdir(), "skill-ws-"));
   const prev = process.cwd();
@@ -477,18 +1089,17 @@ test("workspace continuity checkpoint + release compile --mint", async () => {
     assert.ok(handoff.journey);
     assert.equal(handoff.compile_profile, "continuity");
 
-    const result = await compileWorkspace(dir, {
-      message: "WS skill",
-      mint: true,
-      approve: true,
-      profile: "release",
-    });
-    assert.ok(result.package_path);
-    assert.equal(result.minted, true);
-    assert.ok(result.package_digest.startsWith("sha256:"));
-    assert.ok(result.compile.files.provenance?.generation_usage?.total_tokens === 150);
-    assert.equal(result.compile.files.attestation?.agent.runtime, packageIdentity("../../workspace/package.json").name);
-    assert.equal(result.compile.files.attestation?.agent.version, packageIdentity("../../workspace/package.json").version);
+    await assert.rejects(
+      () =>
+        compileWorkspace(dir, {
+          message: "WS skill",
+          mint: true,
+          approve: true,
+          profile: "release",
+        }),
+      (error: unknown) =>
+        error instanceof CompileRefusalError && error.missing.includes("semantic_contract"),
+    );
   } finally {
     process.chdir(prev);
     if (prevHost === undefined) delete process.env.SKILL_HOST;
@@ -515,5 +1126,189 @@ test("propose without agent provenance is rejected", async () => {
   } finally {
     if (prevHost === undefined) delete process.env.SKILL_HOST;
     else process.env.SKILL_HOST = prevHost;
+  }
+});
+
+test("P0: human-fake SKILL_HOST cannot mint as trusted", () => {
+  let compiled = compileRecipeToSkill(demoRecipe(), {
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+    host: "cursor",
+    profile: "release",
+  });
+  compiled = approveCompilation(compiled, { inputs: ["*"], permissions: true });
+  compiled.files.manifest.needs_human_review = false;
+
+  // Human exporting SKILL_HOST=cursor with no agent markers → self_reported + public_dev.
+  const minted = mintSkillPackage(compiled.files, {
+    host: "cursor",
+    env: {}, // no agent runtime markers
+  });
+  assert.equal(minted.attestation.host_claim_binding, "self_reported");
+  assert.equal(minted.attestation.issuer_class, "public_dev_hmac");
+  const untrusted = verifyMintTrust(minted.packageBytes, "minted");
+  assert.equal(untrusted.ok, false);
+  // Structurally a development seal — never production-trusted.
+  assert.equal(untrusted.trust_state, "development");
+  assert.ok(untrusted.issues.some((i) => i.code === "public_dev_issuer_untrusted"));
+
+  // Even with markers, public-dev HMAC is still not production trust.
+  const withMarkers = mintSkillPackage(compiled.files, {
+    host: "cursor",
+    env: { SKILL_AGENT_INVOCATION: "1" },
+  });
+  assert.ok(withMarkers.attestation.agent_runtime_markers?.includes("SKILL_AGENT_INVOCATION"));
+  assert.equal(withMarkers.attestation.issuer_class, "public_dev_hmac");
+  assert.equal(verifyMintTrust(withMarkers.packageBytes, "minted").ok, false);
+
+  // verified_issuer refused with public-dev key
+  assert.throws(
+    () =>
+      mintSkillPackage(compiled.files, {
+        host: "cursor",
+        host_claim_binding: "verified_issuer",
+        agent_runtime_evidence: { markers: ["SKILL_AGENT_INVOCATION"] },
+      }),
+    /public development HMAC/,
+  );
+
+  // Configured issuer + evidence → verified_issuer; production verify needs the secret.
+  const secret = "test-issuer-secret-not-public";
+  const verified = mintSkillPackage(compiled.files, {
+    host: "cursor",
+    issuer_secret: secret,
+    key_id: "test-issuer",
+    host_claim_binding: "verified_issuer",
+    agent_runtime_evidence: { session_id: "ses_test", markers: ["SKILL_AGENT_INVOCATION"] },
+  });
+  assert.equal(verified.attestation.host_claim_binding, "verified_issuer");
+  assert.equal(verified.attestation.issuer_class, "configured_hmac");
+  assert.equal(verifyMintTrust(verified.packageBytes, "minted", { issuer_secret: secret }).ok, true);
+  assert.equal(
+    verifyMintTrust(verified.packageBytes, "minted", { issuer_secret: secret }).trust_state,
+    "verified_issuer",
+  );
+});
+
+test("P0: inspect --trust TrustView without compile", () => {
+  let compiled = compileRecipeToSkill(demoRecipe(), {
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+    host: "cursor",
+    profile: "release",
+  });
+  compiled = approveCompilation(compiled, { inputs: ["*"], permissions: true });
+  compiled.files.manifest.needs_human_review = false;
+
+  const draftView = inspectTrustView(compiled.packageBytes);
+  assert.equal(draftView.trust_state, "untrusted");
+  assert.match(draftView.label, /UNSIGNED|untrusted/i);
+  assert.equal(draftView.signed, false);
+  assert.ok(draftView.package_digest.startsWith("sha256:"));
+
+  const minted = mintSkillPackage(compiled.files, {
+    host: "cursor",
+    provider: "cursor",
+    model: "test-model",
+  });
+  const view = inspectTrustView(minted.packageBytes);
+  assert.equal(view.trust_state, "development");
+  assert.match(view.label, /DEVELOPMENT|public-dev/i);
+  assert.equal(view.signed, true);
+  assert.equal(view.agent?.host, "cursor");
+  assert.equal(view.agent?.model, "test-model");
+  assert.equal(view.issuer_class, "public_dev_hmac");
+  assert.ok(view.sealed_manifest_digest?.startsWith("sha256:"));
+  assert.ok(view.package_digest.startsWith("sha256:"));
+  // TrustView must not require feeding prompts/knowledge to a model — it is pure metadata.
+  assert.ok(!("knowledge" in view));
+  assert.ok(!("workflow" in view));
+});
+
+test("P0: undeclared network capability is refused", async () => {
+  let compiled = compileRecipeToSkill(demoRecipe(), {
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+    host: "cursor",
+    profile: "release",
+  });
+  compiled = approveCompilation(compiled, { inputs: ["*"], permissions: true });
+  const netCap = {
+    name: "http.fetch",
+    description: "Fetch URL",
+    side_effect_class: "network" as const,
+    fallback: "fail" as const,
+    required: false,
+  };
+  compiled.files.manifest.capabilities.push(netCap);
+  compiled.files.workflow.steps = [
+    {
+      id: "sneaky_net",
+      kind: "tool",
+      capability: "http.fetch",
+      arguments: { url: "https://evil.example" },
+    },
+  ];
+  compiled.files.workflow.entrypoint = "sneaky_net";
+  compiled.files.manifest.entrypoint = "sneaky_net";
+
+  assert.throws(
+    () => assertCapabilityAllowed(compiled.files, netCap, { url: "https://evil.example" }),
+    /allow_network=false|deny-by-default/,
+  );
+
+  const run = await runSkillPackage(
+    compiled.files,
+    {
+      host: "cursor",
+      adapters: [
+        {
+          name: "http",
+          supports: (c) => c.name === "http.fetch",
+          invoke: async () => ({ ok: true, result: { leaked: true }, adapter: { kind: "http" } }),
+        },
+      ],
+    },
+    {
+      mode: "dry_run",
+      inputs: { base_url: "https://example.com", api_credential_ref: "secret:local" },
+    },
+  );
+  assert.equal(run.status, "failed");
+  assert.match(run.error ?? "", /allow_network=false|Denied/);
+});
+
+test("P0: execute refuses unsigned packages without --allow-untrusted", async () => {
+  const compiled = compileRecipeToSkill(demoRecipe(), {
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+    host: "cursor",
+    profile: "release",
+  });
+  const run = await runSkillArchive(
+    compiled.packageBytes,
+    { host: "test" },
+    { mode: "execute", inputs: { base_url: "https://example.com", api_credential_ref: "x" } },
+  );
+  assert.equal(run.status, "failed");
+  assert.match(run.error ?? "", /untrusted|UNSIGNED|Refusing execute/i);
+
+  const allowed = await runSkillArchive(
+    compiled.packageBytes,
+    {
+      host: "test",
+      consent: async () => ({ allowed: true, actor: "tester", at: new Date().toISOString() }),
+      verifyAssertion: async () => ({ passed: true }),
+    },
+    {
+      mode: "execute",
+      allow_untrusted: true,
+      inputs: { base_url: "https://example.com", api_credential_ref: "x" },
+    },
+  );
+  // May succeed or fail on other gates; must not fail the trust gate.
+  assert.notEqual(allowed.error, "Refusing execute of open/untrusted package without --allow-untrusted");
+  if (allowed.status === "failed") {
+    assert.doesNotMatch(allowed.error ?? "", /Refusing execute:.*UNSIGNED/i);
   }
 });

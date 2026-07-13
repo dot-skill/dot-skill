@@ -1,5 +1,6 @@
 import type { SkillManifest, Workflow } from "@dot-skill/protocol";
 import {
+  assessSkillContract,
   CONTAINER_VERSION,
   PROTOCOL_VERSION,
   WORKFLOW_DIALECT_VERSION,
@@ -56,6 +57,24 @@ export function validateManifestShape(manifest: SkillManifest): ValidationIssue[
       code: "protocol_version",
       message: `Unsupported protocol_version ${manifest.protocol_version}; expected ${PROTOCOL_VERSION}`,
     });
+  }
+  if (manifest.compile_profile === "release") {
+    if (!manifest.contract) {
+      issues.push({
+        severity: "error",
+        code: "release_contract_missing",
+        message: "Release packages require a native 0.5 authoring contract",
+      });
+    } else {
+      for (const issue of assessSkillContract(manifest.contract, "release").issues) {
+        issues.push({
+          severity: "error",
+          code: `contract_${issue.code}`,
+          message: `${issue.field}: ${issue.message}`,
+          path: issue.field,
+        });
+      }
+    }
   }
   if (manifest.mint?.mint_status === "minted") {
     if (manifest.compile_profile !== "release") {
@@ -116,6 +135,23 @@ export function validateWorkflowShape(
         code: "step",
         message: "Each step needs id and kind",
       });
+    }
+    const refs = [
+      ...(typeof step.next === "string" ? [step.next] : step.next ?? []),
+      ...(step.on_fail ? [step.on_fail] : []),
+      ...(step.kind === "branch"
+        ? [...step.cases.map((branch) => branch.goto), ...(step.else ? [step.else] : [])]
+        : []),
+    ];
+    for (const ref of refs) {
+      if (!ids.has(ref)) {
+        issues.push({
+          severity: "error",
+          code: "step_reference_missing",
+          message: `Step ${step.id} references missing step ${ref}`,
+          path: step.id,
+        });
+      }
     }
   }
   return issues;
@@ -212,12 +248,16 @@ export function inspectSkill(archive: Uint8Array): {
     version: string;
     title: string;
     description: string;
+    intent?: string;
     inputs: string[];
     permissions: string[];
     capabilities: string[];
     package_digest: string;
+    sealed_manifest_digest?: string;
     mint_status?: string;
     needs_human_review?: boolean;
+    trust_label?: string;
+    trust_state?: string;
   };
   issues: ValidationIssue[];
 } {
@@ -234,11 +274,32 @@ export function inspectSkill(archive: Uint8Array): {
         permissions: [],
         capabilities: [],
         package_digest: "",
+        trust_label: "INVALID",
+        trust_state: "untrusted",
       },
       issues: result.issues,
     };
   }
   const m = result.manifest;
+  const mint_status = m.mint?.mint_status ?? "draft";
+  const signed = Boolean(
+    (result.manifest &&
+      Object.keys(
+        // signatures live outside validate result — infer from mint + attestation_digest
+        m.attestation_digest ? { signed: true } : {},
+      ).length) ||
+      mint_status === "minted",
+  );
+  // Lightweight label without full TrustView import cycle; CLI --trust uses inspectTrustView.
+  let trust_label = "UNSIGNED / OPEN — untrusted";
+  let trust_state = "untrusted";
+  if (mint_status === "minted" && m.attestation_digest) {
+    trust_label = "SEALED — use skill inspect --trust for issuer/host details";
+    trust_state = "self_reported";
+  } else if (!signed || mint_status === "draft") {
+    trust_label = "UNSIGNED / OPEN — untrusted";
+    trust_state = "untrusted";
+  }
   return {
     ok: result.ok,
     summary: {
@@ -246,12 +307,16 @@ export function inspectSkill(archive: Uint8Array): {
       version: m.version,
       title: m.title,
       description: m.description,
+      intent: m.intent,
       inputs: m.inputs.filter((i) => i.required).map((i) => i.name),
       permissions: m.permissions.map((p) => p.side_effect_class),
       capabilities: m.capabilities.map((c) => c.name),
       package_digest: m.package_digest,
-      mint_status: m.mint?.mint_status ?? "draft",
+      sealed_manifest_digest: m.sealed_manifest_digest,
+      mint_status,
       needs_human_review: m.needs_human_review,
+      trust_label,
+      trust_state,
     },
     issues: result.issues,
   };

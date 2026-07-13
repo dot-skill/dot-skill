@@ -1,13 +1,24 @@
 {
-  "name": "dot-skill",
-  "version": "0.4.3",
+  "name": "dot-skill-monorepo",
+  "version": "0.5.0",
   "private": true,
-  "description": "Open .skill Protocol — portable, verifiable AI skill packages (continuity + release).",
+  "description": "Easily create, inspect, and run portable .skill packages for AI agents",
   "license": "MIT",
   "author": {
     "name": "Bharat Dudeja",
     "url": "https://github.com/bharatdudeja13-cmd"
   },
+  "keywords": [
+    "skill",
+    "skillerr",
+    "dot-skill",
+    ".skill",
+    "ai-agents",
+    "agent-skills",
+    "protocol",
+    "portable",
+    "inspectable"
+  ],
   "type": "module",
   "workspaces": [
     "packages/*"
@@ -15,8 +26,9 @@
   "scripts": {
     "build": "npm run build -w @dot-skill/protocol && npm run build -w @dot-skill/core && npm run build -w @dot-skill/runtime && npm run build -w @dot-skill/registry && npm run build -w @dot-skill/workspace && npm run build -w @dot-skill/cli",
     "test": "npm run build && npm run test -w @dot-skill/cli",
-    "test:examples": "SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/knowledge-only/recipe.json --approve --profile continuity -o /tmp/dot-skill-knowledge.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/parameterized-integration/recipe.json --approve --profile release -o /tmp/dot-skill-integration.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/code-changing/recipe.json --approve --profile release -o /tmp/dot-skill-code.skill",
+    "test:examples": "SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/knowledge-only/recipe.json --approve --profile continuity -o /tmp/dot-skill-knowledge.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/parameterized-integration/recipe.json --approve --profile continuity -o /tmp/dot-skill-integration.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/code-changing/recipe.json --approve --profile continuity -o /tmp/dot-skill-code.skill && SKILL_HOST=example-agent node packages/cli/dist/cli.js pack examples/contract-foundation/source.json --profile release -o /tmp/dot-skill-contract.skill",
     "pack:check": "npm pack --workspaces --dry-run",
+    "pack:check:meta": "npm pack -w skillerr --dry-run",
     "skill": "node packages/cli/dist/cli.js",
     "dot-skill": "node packages/cli/dist/cli.js"
   },
@@ -26,5 +38,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/dot-skill/dot-skill.git"
+  },
+  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "bugs": {
+    "url": "https://github.com/dot-skill/dot-skill/issues"
   }
 }

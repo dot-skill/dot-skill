@@ -4,20 +4,23 @@
  *
  * AI agents create; humans review. Continuity drafts for handoff; release for mint.
  *
+ *   npm i -g skillerr                # or: npx -y skillerr --help
  *   export SKILL_HOST=cursor
  *   skill init --title "…"
  *   skill propose --json '[…]'
  *   skill journey --summary "…"
  *   skill checkpoint                 # continuity draft (partial OK)
  *   skill compile -m "…" --mint      # release (complete or refuse)
+ *   skill inspect ./file.skill       # ingest: inspect before run
  *   skill load ./file.skill          # resume handoff in another AI
  */
 
 import { readFileSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import {
   inspectSkill,
+  inspectTrustView,
   migrateLegacySkill,
   toSkillMdAdapter,
   unpackSkill,
@@ -33,7 +36,15 @@ import {
 import { runSkillArchive } from "@dot-skill/runtime";
 import { lookup, list, verify as registryVerify, publish as registryPublish } from "@dot-skill/registry";
 import type { Recipe, SectionType, Skill, SkillSource } from "@dot-skill/protocol";
-import { isValidAgentHost } from "@dot-skill/protocol";
+import {
+  agentCreateGuide,
+  assessSkillContract,
+  explainContractAssessment,
+  extractSkillCandidates,
+  formatAgentGuide,
+  isValidAgentHost,
+  scaffoldSkillContract,
+} from "@dot-skill/protocol";
 import {
   initWorkspace,
   requireWorkspace,
@@ -66,35 +77,55 @@ const VERSION = loadPackageVersion();
 function usage(exitCode = 1): never {
   console.log(`skill — Open .skill Protocol CLI v${VERSION}
 
-Skills record declared agent provenance. Humans review, stage, and approve releases.
+Easily create, inspect, and run portable .skill packages.
+Agents create; humans approve releases.
 
-Workspace:
+Create:
   skill init [--title name]
-  skill status                         Completeness checklist + staged sections
-  skill propose --title T --body B     Agent adds a section (requires SKILL_HOST)
+  skill status                         Completeness + staged sections
+  skill propose --title T --body B     Requires SKILL_HOST
   skill propose --json '[...]'
   skill journey --summary "…"          Redacted human+AI journey (no secrets)
   skill add [id...]                    Stage (default: ALL)
   skill unstage [id...] | skill review | skill discard <id>
-  skill checkpoint [-m msg]            Continuity draft for AI handoff (partial OK)
+  skill checkpoint [-m msg]            Continuity handoff (partial OK)
   skill compile -m "msg" [--approve] [--mint] [--profile release|continuity]
-                                       Release compile refuses if incomplete
-  skill load <file.skill>              Resume context in another AI (no private dumps)
-  skill mint [--host name]             Seal release package (AI host required)
+                                       Release refuses if incomplete
+  skill load <file.skill>              Resume continuity in another AI
+  skill mint [--host name]             Seal release (host required)
 
-Package tools:
-  skill inspect|validate|unpack|run <file.skill>
+Multi-skill identify:
+  skill agent-guide [--json]           Exact create/identify protocol steps
+  skill extract <journey.json> [-o dir] [--profile release|continuity]
+                                       Candidate SkillContract/source scaffolds
+  skill segment …                      Alias of extract
+
+Ingest / run:
+  skill inspect <file.skill> [--trust] TrustView (no compile / no model body)
+  skill validate <file.skill>          Structure + hash integrity
+  skill unpack <file.skill>
+  skill verify-trust <file.skill> [--profile minted] [--allow-development-issuer]
+  skill run <file.skill> [--mode execute] [--allow-untrusted]
+                                       Dry-run by default; execute refuses
+                                       unsigned/dev seals without --allow-untrusted
   skill pack <source.json> [-o out.skill] [--approve] [--profile release]
-  skill verify-trust <file.skill> [--profile minted]
-  skill registry list|lookup <digest>  Optional local log (not a public marketplace)
+  skill contract-template              0.5 authoring contract scaffold
+  skill contract-check <contract.json> Completeness + fixes
+  skill registry list|lookup <digest>  Optional local transparency log
 
-Env (agents):
-  SKILL_HOST (required)  SKILL_PROVIDER  SKILL_MODEL  SKILL_DEPLOYMENT
-  SKILL_ENDPOINT  SKILL_ACTOR  SKILL_AGENT_RUNTIME  SKILL_AGENT_VERSION
-  SKILL_INPUT_TOKENS  SKILL_OUTPUT_TOKENS  SKILL_SESSION_ID
+Env:
+  SKILL_HOST (required to create)   SKILL_PROVIDER  SKILL_MODEL
+  SKILL_DEPLOYMENT  SKILL_ENDPOINT  SKILL_ACTOR
+  SKILL_AGENT_RUNTIME  SKILL_AGENT_VERSION  SKILL_SESSION_ID
+  SKILL_AGENT_INVOCATION               Agent runtime marker (anti env-only spoof)
+  SKILL_INPUT_TOKENS  SKILL_OUTPUT_TOKENS
 
-Install: npm i -g @dot-skill/cli   or   npx @dot-skill/cli …
-Why not markdown: docs/WHY.md
+Notes:
+  SKILL_HOST alone never yields verified_issuer trust. Public-dev HMAC is
+  development-only. human/cli/shell/manual hosts are denylisted for mint.
+
+Install:  npm i -g skillerr   →  skill --help
+Docs:     https://github.com/dot-skill/dot-skill
 `);
   process.exit(exitCode);
 }
@@ -119,6 +150,107 @@ async function main() {
   }
 
   switch (cmd) {
+    case "agent-guide": {
+      if (flag(rest, "--json")) {
+        console.log(JSON.stringify(agentCreateGuide(), null, 2));
+      } else {
+        console.log(formatAgentGuide());
+      }
+      break;
+    }
+    case "extract":
+    case "segment": {
+      const file = rest.find((a) => !a.startsWith("-"));
+      if (!file) {
+        console.error(
+          "Usage: skill extract <journey.json> [-o dir] [--profile release|continuity]\n" +
+            "       journey.json: { summary, candidates|topics: [...] }\n" +
+            "       See: skill agent-guide",
+        );
+        process.exit(2);
+      }
+      const profile = (opt(rest, "--profile") as "release" | "continuity") ?? "release";
+      const outDir = opt(rest, "-o") ?? opt(rest, "--out");
+      const raw = JSON.parse(await readFile(resolve(file!), "utf8")) as unknown;
+      const report = extractSkillCandidates(raw, {
+        profile,
+        host: process.env.SKILL_HOST,
+      });
+      if (outDir) {
+        const root = resolve(outDir);
+        await mkdir(root, { recursive: true });
+        await writeFile(join(root, "extraction.json"), `${JSON.stringify(report, null, 2)}\n`);
+        for (const scaffold of report.scaffolds) {
+          const dir = join(root, "candidates", scaffold.workspace_slug);
+          await mkdir(dir, { recursive: true });
+          await writeFile(
+            join(dir, "contract.json"),
+            `${JSON.stringify(scaffold.contract_scaffold, null, 2)}\n`,
+          );
+          await writeFile(
+            join(dir, "source.json"),
+            `${JSON.stringify(scaffold.source_scaffold, null, 2)}\n`,
+          );
+          await writeFile(
+            join(dir, "assessment.json"),
+            `${JSON.stringify(
+              {
+                candidate: scaffold.candidate,
+                missing: scaffold.missing,
+                next_steps: scaffold.next_steps,
+              },
+              null,
+              2,
+            )}\n`,
+          );
+        }
+      }
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            written: outDir ? resolve(outDir) : null,
+            ...report,
+            note:
+              "Scaffolds are intentionally incomplete. Complete each SkillContract, one workspace per candidate, then contract-check / status before release compile.",
+          },
+          null,
+          2,
+        ),
+      );
+      // Non-zero if any candidate is incomplete (expected for fresh extract).
+      process.exit(report.scaffolds.every((s) => s.candidate.assessment.complete) ? 0 : 2);
+      break;
+    }
+    case "contract-template": {
+      console.log(JSON.stringify(scaffoldSkillContract(), null, 2));
+      break;
+    }
+    case "contract-check": {
+      const file = rest[0];
+      if (!file) usage();
+      const profile = (opt(rest, "--profile") as "release" | "continuity") ?? "release";
+      const parsed = JSON.parse(await readFile(resolve(file!), "utf8")) as
+        | SkillSource
+        | unknown;
+      const contract =
+        parsed && typeof parsed === "object" && "kind" in parsed && parsed.kind === "skill_source"
+          ? (parsed as SkillSource).contract
+          : parsed;
+      const assessment = assessSkillContract(contract, profile);
+      console.log(
+        JSON.stringify(
+          {
+            assessment,
+            explanation: explainContractAssessment(assessment),
+          },
+          null,
+          2,
+        ),
+      );
+      process.exit(assessment.complete ? 0 : 2);
+      break;
+    }
     case "init": {
       const title = opt(rest, "--title");
       const { root, created } = await initWorkspace(process.cwd(), { title });
@@ -306,7 +438,7 @@ async function main() {
     case "bake": {
       if (cmd === "bake") {
         console.error(
-          "note: `bake` is a Skillerr product term; open protocol command is `skill compile`",
+          "note: `bake` is a legacy alias; the protocol command is `skill compile`",
         );
       }
       const root = requireWorkspace();
@@ -444,7 +576,7 @@ async function main() {
       console.error(
         "Publish is not part of the open .skill happy path.\n" +
           "Share the .skill file (git, chat, drive). Optional local log: skill registry publish <file>\n" +
-          "Hosted registries are product concerns (e.g. Skillerr), not this protocol.",
+          "Hosted registries are product concerns, not this protocol.",
       );
       process.exit(2);
       break;
@@ -453,7 +585,12 @@ async function main() {
     case "inspect": {
       const file = rest[0];
       if (!file) usage();
-      console.log(JSON.stringify(inspectSkill(new Uint8Array(await readFile(resolve(file!)))), null, 2));
+      const bytes = new Uint8Array(await readFile(resolve(file!)));
+      if (flag(rest, "--trust")) {
+        console.log(JSON.stringify(inspectTrustView(bytes), null, 2));
+      } else {
+        console.log(JSON.stringify(inspectSkill(bytes), null, 2));
+      }
       break;
     }
     case "validate": {
@@ -558,7 +695,12 @@ async function main() {
       const run = await runSkillArchive(
         new Uint8Array(await readFile(resolve(file!))),
         { host: process.env.SKILL_HOST ?? "runtime" },
-        { mode, inputs },
+        {
+          mode,
+          inputs,
+          allow_untrusted: flag(rest, "--allow-untrusted"),
+          allow_development_issuer: flag(rest, "--allow-development-issuer"),
+        },
       );
       console.log(JSON.stringify(run, null, 2));
       process.exit(run.status === "succeeded" || run.status === "paused" ? 0 : 2);
@@ -570,7 +712,10 @@ async function main() {
       const profile = (opt(rest, "--profile") ?? "minted") as "open" | "minted" | "anchored";
       console.log(
         JSON.stringify(
-          verifyMintTrust(new Uint8Array(await readFile(resolve(file!))), profile),
+          verifyMintTrust(new Uint8Array(await readFile(resolve(file!))), profile, {
+            allow_development_issuer: flag(rest, "--allow-development-issuer"),
+            allow_self_reported: flag(rest, "--allow-self-reported"),
+          }),
           null,
           2,
         ),

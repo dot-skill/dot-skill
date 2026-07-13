@@ -1,0 +1,76 @@
+{
+  "kind": "skill_source",
+  "id": "src_plain_writing_05",
+  "hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "title": "Plain writing",
+  "summary": "Apply reviewed plain-language rules.",
+  "intent": "Rewrite text in concise, direct language.",
+  "contract": {
+    "kind": "skill_contract",
+    "contract_version": "0.5",
+    "skill_kind": "knowledge",
+    "title": "Plain writing",
+    "intent": "Rewrite text in concise, direct language.",
+    "sensitivity": "public",
+    "triggers": {
+      "status": "specified",
+      "items": [{ "id": "rewrite", "description": "Text needs a plain-language rewrite." }]
+    },
+    "inputs": {
+      "status": "specified",
+      "items": [{
+        "name": "text",
+        "description": "Text to rewrite",
+        "schema": { "type": "string" },
+        "required": true,
+        "sensitivity": "private",
+        "source": "human",
+        "ask_when": "if_missing",
+        "approval": "none"
+      }]
+    },
+    "preconditions": { "status": "none", "reason": "The text input is the only precondition." },
+    "steps": {
+      "status": "specified",
+      "items": [
+        { "id": "rewrite", "title": "Rewrite plainly", "kind": "instruct", "instruction": "Rewrite {{text}} using short, direct sentences." },
+        { "id": "emit", "title": "Return rewritten text", "kind": "emit", "output": "result", "from": "rewrite" }
+      ]
+    },
+    "branches": { "status": "none", "reason": "No conditional behavior is needed." },
+    "human_decisions": { "status": "none", "reason": "No irreversible action occurs." },
+    "capabilities": { "status": "none", "reason": "This is a knowledge-only skill." },
+    "permissions": { "status": "none", "reason": "No tool, filesystem, network, or execution permission is needed." },
+    "forbidden_actions": {
+      "status": "specified",
+      "items": [{ "id": "no_new_claims", "description": "Do not add factual claims absent from the input.", "enforcement": "host" }]
+    },
+    "outputs": {
+      "status": "specified",
+      "items": [{ "name": "result", "description": "Plain-language rewrite", "schema": { "type": "string" }, "required": true }]
+    },
+    "recovery": { "status": "not_applicable", "reason": "The skill has no side effects to recover." },
+    "verification": {
+      "status": "specified",
+      "items": [{ "id": "meaning_retained", "assertion": "The rewrite preserves the source meaning.", "check": "human", "required": true }]
+    },
+    "corrections": { "status": "none", "reason": "No prior correction was part of this example." },
+    "provenance": {
+      "evidence": { "status": "specified", "items": [{ "id": "example_review", "kind": "review", "ref": "docs/AUTHORING-CONTRACT.md", "supports": ["complete contract"] }] },
+      "limitations": { "status": "none", "reason": "No known limitation." },
+      "human_review": { "status": "reviewed", "actor": "example-author", "at": "2026-07-13T00:00:00.000Z", "scope": ["complete contract"] }
+    }
+  },
+  "sections": [],
+  "steering": [],
+  "prompts": [],
+  "code_refs": [],
+  "parents": [],
+  "agent": { "host": "example-agent", "deployment": "local" },
+  "journey": { "summary": "Agent authored and a human reviewed the complete example contract.", "redacted": true, "sensitivity": "public" },
+  "inputs_declared": "none",
+  "sensitivity": "public",
+  "created_at": "2026-07-13T00:00:00.000Z",
+  "actor": { "id": "example-author" },
+  "source_protocol_version": "0.5.0"
+}

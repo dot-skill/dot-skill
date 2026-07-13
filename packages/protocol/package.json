@@ -1,12 +1,21 @@
 {
   "name": "@dot-skill/protocol",
-  "version": "0.4.3",
-  "description": "Open .skill Protocol — types, SkillSource, completeness",
+  "version": "0.5.0",
+  "description": "Types, schemas, and completeness rules for portable .skill packages",
   "license": "MIT",
   "author": {
     "name": "Bharat Dudeja",
     "url": "https://github.com/bharatdudeja13-cmd"
   },
+  "keywords": [
+    "skill",
+    "dot-skill",
+    ".skill",
+    "ai-agents",
+    "agent-skills",
+    "protocol",
+    "types"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,14 +27,22 @@
     "url": "https://github.com/dot-skill/dot-skill.git",
     "directory": "packages/protocol"
   },
+  "homepage": "https://github.com/dot-skill/dot-skill#readme",
+  "bugs": {
+    "url": "https://github.com/dot-skill/dot-skill/issues"
+  },
   "files": [
-    "dist"
+    "dist",
+    "skill-contract.schema.json",
+    "README.md",
+    "LICENSE"
   ],
   "exports": {
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    }
+    },
+    "./skill-contract.schema.json": "./skill-contract.schema.json"
   },
   "scripts": {
     "build": "rm -rf dist && tsc",
