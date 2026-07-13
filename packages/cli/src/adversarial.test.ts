@@ -1,0 +1,318 @@
+/**
+ * SEC-L: adversarial fixtures corpus.
+ *
+ * Every hostile input here must be refused with a distinct, machine-readable
+ * error/issue code — never a crash, never a silent accept. This is also the
+ * corpus a second independent implementation (Go/Rust/…) should reproduce
+ * before this protocol is called Stable — see docs/ROADMAP.md.
+ */
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { strToU8, zipSync } from "fflate";
+import {
+  approveCompilation,
+  compileSkillSource,
+  mintSkillPackage,
+  PUBLIC_DEV_MINT_KEY,
+  packSkill,
+  unpackSkill,
+  UnsafePathError,
+  UnsafeZipError,
+  validatePackageBytes,
+} from "@skillerr/core";
+import { inspectTrustView, verifyMintTrust } from "@skillerr/core";
+import { runSkillArchive } from "@skillerr/runtime";
+import {
+  CONTAINER_VERSION,
+  DEFAULT_SKILL_POLICY,
+  PROTOCOL_VERSION,
+  WORKFLOW_DIALECT_VERSION,
+  type SkillContract,
+  type SkillSource,
+} from "@skillerr/protocol";
+
+function validContract(): SkillContract {
+  return {
+    kind: "skill_contract",
+    contract_version: "0.5",
+    skill_kind: "knowledge",
+    title: "Adversarial fixture",
+    intent: "A minimal complete contract used as the base for tampering fixtures.",
+    sensitivity: "private",
+    triggers: { status: "specified", items: [{ id: "t1", description: "Always." }] },
+    inputs: { status: "none", reason: "No inputs needed." },
+    preconditions: { status: "none", reason: "None." },
+    steps: {
+      status: "specified",
+      items: [
+        { id: "s1", title: "Say hello", kind: "instruct", instruction: "Say hello." },
+        { id: "s2", title: "Emit", kind: "emit", output: "result", from: "s1" },
+      ],
+    },
+    branches: { status: "none", reason: "None." },
+    human_decisions: { status: "none", reason: "None." },
+    capabilities: { status: "none", reason: "None." },
+    permissions: { status: "none", reason: "None." },
+    forbidden_actions: { status: "none", reason: "None." },
+    outputs: {
+      status: "specified",
+      items: [{ name: "result", description: "Greeting", schema: { type: "string" }, required: true }],
+    },
+    recovery: { status: "not_applicable", reason: "No side effects." },
+    verification: {
+      status: "specified",
+      items: [{ id: "v1", assertion: "A greeting was produced.", check: "human", required: true }],
+    },
+    corrections: { status: "none", reason: "None." },
+    provenance: {
+      evidence: { status: "none", reason: "None." },
+      limitations: { status: "none", reason: "None." },
+      human_review: {
+        status: "reviewed",
+        actor: "fixture-author",
+        at: "2026-07-13T00:00:00.000Z",
+        scope: ["complete contract"],
+      },
+    },
+  };
+}
+
+function validSource(): SkillSource {
+  const contract = validContract();
+  return {
+    kind: "skill_source",
+    id: "src_adversarial",
+    hash: "sha256:" + "a".repeat(64),
+    title: contract.title,
+    contract,
+    sections: [
+      {
+        id: "sec1",
+        revision: 1,
+        type: "doc",
+        title: "Note",
+        body: "Plain knowledge body for tampering fixtures.",
+        attachments: [],
+        code_refs: [],
+        sensitivity: "shareable_redacted",
+        authored_by: "agent",
+      },
+    ],
+    steering: [],
+    prompts: [],
+    code_refs: [],
+    parents: [],
+    agent: { host: "cursor" },
+    journey: { summary: "Adversarial fixture source.", redacted: true, sensitivity: "private" },
+    inputs_declared: "none",
+    sensitivity: "private",
+    created_at: "2026-07-13T00:00:00.000Z",
+    actor: { id: "test-agent" },
+    source_protocol_version: PROTOCOL_VERSION,
+  };
+}
+
+function validPackageBytes(): Uint8Array {
+  const compiled = compileSkillSource(validSource(), {
+    profile: "release",
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+  });
+  return compiled.packageBytes;
+}
+
+function rawStoredZip(entries: Array<{ name: string; data: string }>): Uint8Array {
+  const parts: Uint8Array[] = [];
+  for (const { name, data } of entries) {
+    const nameBytes = strToU8(name);
+    const dataBytes = strToU8(data);
+    const header = new Uint8Array(30);
+    const view = new DataView(header.buffer);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(6, 0, true);
+    view.setUint16(8, 0, true);
+    view.setUint16(10, 0, true);
+    view.setUint16(12, 0, true);
+    view.setUint32(14, 0, true);
+    view.setUint32(18, dataBytes.length, true);
+    view.setUint32(22, dataBytes.length, true);
+    view.setUint16(26, nameBytes.length, true);
+    view.setUint16(28, 0, true);
+    parts.push(header, nameBytes, dataBytes);
+  }
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const p of parts) {
+    out.set(p, offset);
+    offset += p.length;
+  }
+  return out;
+}
+
+test("adversarial: ../ traversal entry -> path_traversal", () => {
+  const archive = rawStoredZip([{ name: "resources/../../etc/passwd", data: "x" }]);
+  assert.throws(
+    () => unpackSkill(archive),
+    (e: unknown) => e instanceof UnsafePathError && e.code === "path_traversal",
+  );
+});
+
+test("adversarial: C:/ absolute entry -> windows_absolute_path", () => {
+  const archive = rawStoredZip([{ name: "C:/evil.txt", data: "x" }]);
+  assert.throws(
+    () => unpackSkill(archive),
+    (e: unknown) => e instanceof UnsafePathError && e.code === "windows_absolute_path",
+  );
+});
+
+test("adversarial: symlink-style entry content is inert (no real filesystem extraction exists to escape)", () => {
+  // Local zip file headers carry no Unix mode/symlink bit (that lives only
+  // in the central directory, which this reader intentionally never
+  // parses — see SEC-D). A "symlink entry" attack's actual danger is
+  // entirely in what NAME it would be extracted to; that's covered by the
+  // same path_traversal/absolute_path checks above regardless of what the
+  // entry's bytes contain. unpackSkill never writes real files or follows
+  // any path found in entry content, so a symlink-target-shaped byte
+  // string is just opaque data here. Residual risk: if a future host adds
+  // real filesystem extraction (e.g. Phase 4's bundled-script execution),
+  // it must independently validate against symlink escapes at that point.
+  const archive = rawStoredZip([
+    { name: "skill.json", data: '{"kind":"dot-skill"}' },
+    { name: "workflow.json", data: '{"kind":"workflow"}' },
+    { name: "resources/link.txt", data: "../../../etc/passwd" },
+  ]);
+  const { files } = unpackSkill(archive);
+  assert.equal(new TextDecoder().decode(files["resources/link.txt"]), "../../../etc/passwd");
+});
+
+test("adversarial: zip bomb (extreme compression ratio) -> suspicious_compression_ratio", () => {
+  const bomb = packSkill({
+    manifest: {
+      kind: "dot-skill",
+      id: "skl_bomb",
+      version: "1.0.0",
+      title: "bomb",
+      description: "bomb",
+      container_version: CONTAINER_VERSION,
+      protocol_version: PROTOCOL_VERSION,
+      entrypoint: "s1",
+      inputs: [],
+      outputs: [],
+      capabilities: [],
+      permissions: [],
+      policy: { ...DEFAULT_SKILL_POLICY },
+      content: [],
+      package_digest: "sha256:" + "0".repeat(64),
+      provenance_mode: "proof_only",
+    },
+    workflow: {
+      kind: "workflow",
+      dialect_version: WORKFLOW_DIALECT_VERSION,
+      entrypoint: "s1",
+      steps: [{ id: "s1", kind: "instruct", text: "x" }],
+    },
+    knowledge: [],
+    resources: { "bomb.txt": "0".repeat(4_000_000) },
+  });
+  assert.throws(
+    () => unpackSkill(bomb),
+    (e: unknown) => e instanceof UnsafeZipError && e.code === "suspicious_compression_ratio",
+  );
+});
+
+test("adversarial: duplicate skill.json entries -> duplicate_entry", () => {
+  const archive = rawStoredZip([
+    { name: "skill.json", data: '{"id":"looks-benign"}' },
+    { name: "skill.json", data: '{"id":"actually-used"}' },
+  ]);
+  assert.throws(
+    () => unpackSkill(archive),
+    (e: unknown) => e instanceof UnsafeZipError && e.code === "duplicate_entry",
+  );
+});
+
+test("adversarial: tampered knowledge content digest -> digest_mismatch", () => {
+  const { files } = unpackSkill(validPackageBytes());
+  const knowledgePath = Object.keys(files).find((p) => p.startsWith("knowledge/"))!;
+  const tampered = zipSync({
+    ...files,
+    [knowledgePath]: strToU8('{"kind":"knowledge","id":"k_tampered","title":"h4x","body":"h4x"}'),
+  });
+  const validation = validatePackageBytes(tampered);
+  assert.equal(validation.ok, false);
+  assert.ok(validation.issues.some((i) => i.code === "digest_mismatch"));
+});
+
+test("adversarial: tampered manifest capabilities -> manifest_digest_mismatch", () => {
+  const { files } = unpackSkill(validPackageBytes());
+  const manifest = JSON.parse(new TextDecoder().decode(files["skill.json"]!)) as Record<
+    string,
+    unknown
+  >;
+  manifest.capabilities = [
+    {
+      name: "exec.shell",
+      description: "Run arbitrary shell commands",
+      side_effect_class: "exec",
+      fallback: "ask_human",
+      required: true,
+    },
+  ];
+  const tampered = zipSync({ ...files, "skill.json": strToU8(JSON.stringify(manifest)) });
+  const validation = validatePackageBytes(tampered);
+  assert.equal(validation.ok, false);
+  assert.ok(validation.issues.some((i) => i.code === "manifest_digest_mismatch"));
+});
+
+test("adversarial: stripped issuer_class -> missing_issuer_class", () => {
+  const compiled = compileSkillSource(validSource(), {
+    profile: "release",
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+  });
+  const approved = approveCompilation(compiled, { inputs: ["*"], permissions: true });
+  approved.files.manifest.needs_human_review = false;
+  const { packageBytes } = mintSkillPackage(approved.files, { host: "cursor" });
+
+  const { raw } = unpackSkill(packageBytes);
+  const dsse = raw.signatures!["creation.dsse.json"] as { attestation: Record<string, unknown> };
+  delete dsse.attestation.issuer_class;
+  const tampered = packSkill({ ...raw, signatures: raw.signatures });
+
+  const trust = verifyMintTrust(tampered, "minted", {
+    allow_development_issuer: true,
+    allow_self_reported: true,
+  });
+  assert.equal(trust.ok, false);
+  assert.ok(trust.issues.some((i) => i.code === "missing_issuer_class"));
+});
+
+test("adversarial: dev-HMAC-minted package (trust_state=development) still refuses execute without --allow-untrusted", async () => {
+  const compiled = compileSkillSource(validSource(), {
+    profile: "release",
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+  });
+  const approved = approveCompilation(compiled, { inputs: ["*"], permissions: true });
+  approved.files.manifest.needs_human_review = false;
+  const { packageBytes } = mintSkillPackage(approved.files, { host: "cursor" });
+
+  // Confirm this fixture actually exercises trust_state=development, not
+  // merely "unsigned" — public_dev_hmac is forgeable by anyone, so
+  // execute must treat it identically to untrusted.
+  const trustView = inspectTrustView(packageBytes);
+  assert.equal(trustView.trust_state, "development");
+
+  const refused = await runSkillArchive(packageBytes, { host: "test" }, { mode: "execute" });
+  assert.equal(refused.status, "failed");
+  assert.match(refused.error ?? "", /Refusing execute/);
+
+  const allowed = await runSkillArchive(
+    packageBytes,
+    { host: "test", consent: async () => ({ allowed: true, actor: "t", at: new Date().toISOString() }) },
+    { mode: "execute", allow_untrusted: true },
+  );
+  assert.doesNotMatch(allowed.error ?? "", /Refusing execute/);
+});

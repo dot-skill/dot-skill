@@ -13,6 +13,12 @@ Status: protocol **Draft 0.5.0**; reference packages **0.6.0**.
 - [x] Local/offline agent provenance (Ollama, LM Studio, llama.cpp, custom)
 - [x] Complete transferable `SkillContract`, assessment APIs, and JSON Schema
 - [x] Structured contract-to-manifest/workflow compilation
+- [x] Content-addressed `skill_id`; byte-identical repacking of the same source
+- [x] RFC 8785 canonicalization pinned, with cross-implementation test vectors
+      (`fixtures/canonicalization/`)
+- [x] Adversarial package corpus (zip bombs, path tricks, hash mismatch,
+      duplicate entries, tampered digests, stripped issuer_class) —
+      `packages/cli/src/adversarial.test.ts`, run on every `npm test`
 
 ## Next (great contribution targets)
 
@@ -21,8 +27,8 @@ Status: protocol **Draft 0.5.0**; reference packages **0.6.0**.
 - [ ] HTTP transparency-log server (same log format as local registry)
 - [ ] Stronger `verify` assertion language + fixtures
 - [ ] Host adapters: local OpenAI-compatible, Cursor, Claude Code, Codex
-- [ ] Second language runtime (Go or Rust) for Stable eligibility
-- [ ] Adversarial package corpus (zip bombs, path tricks, hash mismatch)
+- [ ] Second language runtime (Go or Rust) for Stable eligibility — reproduce
+      the adversarial corpus and canonicalization vectors byte-for-byte
 - [ ] Official `SKILL.md` round-trip adapter tests
 - [ ] Public RFC folder (`docs/rfcs/`)
 

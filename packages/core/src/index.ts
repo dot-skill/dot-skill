@@ -16,6 +16,7 @@ export {
   MAX_ENTRIES,
   MAX_UNCOMPRESSED_BYTES,
   MAX_COMPRESSION_RATIO,
+  UnsafePathError,
 } from "./paths.js";
 export {
   buildFileMap,

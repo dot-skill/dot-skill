@@ -45,7 +45,7 @@
     "build": "rimraf dist && tsc -p tsconfig.json",
     "clean": "rimraf dist",
     "prepack": "npm run build",
-    "test": "node --test dist/conformance.test.js"
+    "test": "node --test dist/conformance.test.js dist/adversarial.test.js"
   },
   "dependencies": {
     "@skillerr/core": "^0.6.0",
