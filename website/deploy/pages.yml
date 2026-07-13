@@ -27,11 +27,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            website/package-lock.json
+          node-version: "22"
 
       - name: Build reference CLI
         run: npm ci && npm run build
@@ -39,8 +35,10 @@ jobs:
       - name: Install website deps
         working-directory: website
         run: |
-          rm -rf node_modules
+          rm -rf node_modules package-lock.json
           npm install
+          # Explicit native binding for Linux runners (npm optionalDeps bug)
+          npm install --no-save @rollup/rollup-linux-x64-gnu
 
       - name: Build fixtures and site
         working-directory: website
