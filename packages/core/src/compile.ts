@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import type {
   CompletenessPart,
   CompletenessReport,
@@ -28,6 +28,7 @@ import {
   isValidAgentHost,
   recipeToSkillSource,
 } from "@skillerr/protocol";
+import { canonicalize } from "./hash.js";
 import { packSkill, finalizeManifest, buildFileMap } from "./pack.js";
 
 const PLACEHOLDER_RE =
@@ -72,8 +73,19 @@ const GENERALIZABLE_PATTERNS: Array<{
   },
 ];
 
-function shortId(prefix: string): string {
-  return `${prefix}_${createHash("sha256").update(randomUUID()).digest("hex").slice(0, 12)}`;
+/**
+ * PROTO-1: skill_id is derived from the source's own content (hash +
+ * contract, when present) rather than a random UUID. The same logical
+ * skill compiled twice gets the same identity — random ids meant identity
+ * carried no integrity meaning and every rebuild silently changed it,
+ * which also made byte-identical repacking (SEC-J) impossible. A
+ * human-friendly label still lives in manifest.title, separate from id.
+ */
+function contentAddressedSkillId(source: SkillSource): string {
+  const seed = source.contract
+    ? `${source.hash}:${canonicalize(source.contract)}`
+    : source.hash;
+  return `skl_${createHash("sha256").update(seed).digest("hex").slice(0, 12)}`;
 }
 
 function knowledgeTypeFor(section: SkillSection): KnowledgeItemType {
@@ -174,6 +186,13 @@ export interface CompileOptions {
   version?: string;
   title?: string;
   description?: string;
+  /**
+   * compilation_report.created_at. Defaults to source.created_at (not
+   * wall-clock) so compiling the same source twice is byte-identical
+   * (SEC-J). Pass explicitly to record a different, still-deterministic
+   * timestamp.
+   */
+  created_at?: string;
   provenance_mode?: "full" | "redacted" | "proof_only";
   profile?: SkillCompileProfile;
   /** When true, inferred inputs are marked approved (human already reviewed). */
@@ -412,7 +431,7 @@ function compileNativeContract(
     throw new CompileRefusalError(completeness);
   }
 
-  const skillId = opts.skill_id ?? shortId("skl");
+  const skillId = opts.skill_id ?? contentAddressedSkillId(source);
   const inputs = declaredItems(contract.inputs).map((input) => ({
     name: input.name,
     description: input.description,
@@ -584,7 +603,7 @@ function compileNativeContract(
     skill_id: skillId,
     source_id: source.id,
     profile,
-    created_at: new Date().toISOString(),
+    created_at: opts.created_at ?? source.created_at,
     mappings: [],
     inferred_inputs: [],
     issues: [
@@ -705,7 +724,7 @@ export function compileSkillSource(
       ],
     });
   }
-  const skillId = opts.skill_id ?? shortId("skl");
+  const skillId = opts.skill_id ?? contentAddressedSkillId(source);
   const version = opts.version ?? "1.0.0";
   const issues: CompilationIssue[] = [];
   const mappings: CompilationMapping[] = [];
@@ -1026,7 +1045,7 @@ export function compileSkillSource(
     source_id: source.id,
     recipe_id: source.source_refs?.find((r) => r.kind === "recipe")?.id,
     profile,
-    created_at: new Date().toISOString(),
+    created_at: opts.created_at ?? source.created_at,
     mappings,
     inferred_inputs: inferredInputs,
     issues,

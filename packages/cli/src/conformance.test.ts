@@ -1032,6 +1032,68 @@ test("digest helper", () => {
   assert.match(sha256Digest("abc"), /^sha256:[a-f0-9]{64}$/);
 });
 
+test("SEC-J: compiling the same source twice produces byte-identical packages", () => {
+  const contract = demoContract();
+  const source: SkillSource = {
+    kind: "skill_source",
+    id: "src_determinism",
+    hash: "sha256:" + "d".repeat(64),
+    title: contract.title,
+    contract,
+    sections: [],
+    steering: [],
+    prompts: [],
+    code_refs: [],
+    parents: [],
+    agent: { host: "cursor" },
+    journey: { summary: "Determinism fixture.", redacted: true, sensitivity: "private" },
+    inputs_declared: "none",
+    sensitivity: "private",
+    created_at: "2026-07-13T00:00:00.000Z",
+    actor: { id: "test-agent" },
+    source_protocol_version: PROTOCOL_VERSION,
+  };
+  const opts = { profile: "release" as const, approve_inferred_inputs: true, approve_permissions: true };
+  const a = compileSkillSource(source, opts);
+  const b = compileSkillSource(structuredClone(source), opts);
+
+  assert.equal(a.files.manifest.id, b.files.manifest.id);
+  assert.equal(a.files.manifest.package_digest, b.files.manifest.package_digest);
+  assert.equal(a.files.manifest.manifest_digest, b.files.manifest.manifest_digest);
+  assert.deepEqual(a.packageBytes, b.packageBytes);
+});
+
+test("PROTO-1: skill_id is content-addressed — same source hash+contract yields the same id, a different one yields a different id", () => {
+  const contract = demoContract();
+  const makeSource = (hash: string): SkillSource => ({
+    kind: "skill_source",
+    id: "src_proto1",
+    hash,
+    title: contract.title,
+    contract,
+    sections: [],
+    steering: [],
+    prompts: [],
+    code_refs: [],
+    parents: [],
+    agent: { host: "cursor" },
+    journey: { summary: "PROTO-1 fixture.", redacted: true, sensitivity: "private" },
+    inputs_declared: "none",
+    sensitivity: "private",
+    created_at: "2026-07-13T00:00:00.000Z",
+    actor: { id: "test-agent" },
+    source_protocol_version: PROTOCOL_VERSION,
+  });
+  const opts = { profile: "release" as const, approve_inferred_inputs: true, approve_permissions: true };
+  const sameHashA = compileSkillSource(makeSource("sha256:" + "1".repeat(64)), opts);
+  const sameHashB = compileSkillSource(makeSource("sha256:" + "1".repeat(64)), opts);
+  const differentHash = compileSkillSource(makeSource("sha256:" + "2".repeat(64)), opts);
+
+  assert.match(sameHashA.files.manifest.id, /^skl_[a-f0-9]{12}$/);
+  assert.equal(sameHashA.files.manifest.id, sameHashB.files.manifest.id);
+  assert.notEqual(sameHashA.files.manifest.id, differentHash.files.manifest.id);
+});
+
 test("SEC-F: a draft (never-minted) package carries a self-consistent manifest_digest", () => {
   const recipe = demoRecipe();
   recipe.id = "rcp_secf_draft";

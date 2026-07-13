@@ -16,6 +16,14 @@ import {
   normalizePath,
 } from "./paths.js";
 
+/**
+ * SEC-J: fixed zip entry mtime so packing the same content twice is
+ * byte-identical. Zip's DOS-date encoding only represents 1980–2099, so
+ * this can't be the Unix epoch (1970) — 1980-01-01 is the earliest
+ * representable date and the conventional choice for reproducible zips.
+ */
+const EPOCH = new Date("1980-01-01T00:00:00Z");
+
 /** Every unsafe-zip refusal gets a distinct, machine-readable code (SEC-D/E, feeds SEC-L fixtures). */
 export class UnsafeZipError extends Error {
   code: string;
@@ -240,7 +248,17 @@ export function packSkill(pkg: SkillPackageFiles, _opts: PackOptions = {}): Uint
   if (total > MAX_UNCOMPRESSED_BYTES) {
     throw new Error(`Package too large: ${total} bytes`);
   }
-  return zipSync(files, { level: 6 });
+  // SEC-J: deterministic zip. Sorted entry order (buildFileMap's own
+  // insertion order isn't a promised contract) and a fixed per-entry mtime
+  // — fflate defaults mtime to wall-clock, so packing byte-identical
+  // content twice previously produced different archives every time.
+  // Single compression level (6, uniform) and forward-slash paths
+  // (normalizePath already guarantees this) round out determinism.
+  const deterministic: Record<string, [Uint8Array, { level: 6; mtime: Date }]> = {};
+  for (const path of Object.keys(files).sort()) {
+    deterministic[path] = [files[path]!, { level: 6, mtime: EPOCH }];
+  }
+  return zipSync(deterministic);
 }
 
 export interface UnpackResult {

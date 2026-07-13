@@ -91,6 +91,15 @@ example.skill
 ## Integrity & trust
 
 - Canonical JSON for the package index: JCS-inspired serialization · Digests: `sha256:<hex>`
+- **`skill_id`** (PROTO-1) is content-addressed — `skl_<sha256-prefix>` derived from
+  `source.hash` (and `source.contract`, when present), not a random UUID. The same
+  logical skill compiled twice gets the same identity; a human-friendly label still
+  lives in `manifest.title`, separate from `id`
+- Compiling the same `SkillSource` twice is **byte-identical** (SEC-J): the zip
+  container uses a sorted entry order and a fixed per-entry mtime (fflate defaults
+  to wall-clock, which alone broke this), and `compilation_report.created_at`
+  derives from `source.created_at` / an explicit `opts.created_at`, never
+  `new Date()`. Enforced by a determinism test in CI on ubuntu/windows/macos
 - `package_digest` excludes `skill.json` and `signatures/**`
 - **`sealed_manifest_digest`** binds identity + permissions/policy/capabilities + content claims inside the creation seal — present only once minted
 - **`manifest_digest`**: the same identity/permissions/policy/capabilities/content claim set, self-digested at pack time and checked by `skill validate` on *every* package, minted or not (`manifest_digest_missing` / `manifest_digest_mismatch`). Without it, `package_digest` excluding `skill.json` plus `sealed_manifest_digest` only existing post-mint meant a draft/continuity package's own permissions/capabilities/policy carried no integrity binding at all — hand-edited tampering passed `skill validate` silently. For a minted package `manifest_digest` equals `sealed_manifest_digest` (same computation over the post-seal policy state)
