@@ -226,6 +226,18 @@ async function listSectionFiles(root: string): Promise<WorkspaceSection[]> {
       const raw = await readJson<WorkspaceSection & { kind?: string; source?: string }>(
         join(dir, f),
       );
+      // Sections on disk are only ever agent-authored via proposeSection,
+      // which always writes source:"agent". A file that declares a
+      // different source was placed there some other way (e.g. a human
+      // editing/adding it directly) — that must be rejected, not silently
+      // relabeled as agent-authored (BUG-2 provenance washing).
+      if (raw.source !== undefined && raw.source !== "agent") {
+        throw new Error(
+          `Section file ${join(dir, f)} declares source="${raw.source}", not "agent". ` +
+            `Workspace sections must be agent-authored (skill propose); this file was not ` +
+            `written by this workspace and will not be silently relabeled. Remove or fix it.`,
+        );
+      }
       const section: WorkspaceSection = {
         kind: "section",
         id: raw.id,
@@ -464,7 +476,10 @@ async function toSkillSource(
     inputs_declared: "none",
     sensitivity: "shareable_redacted",
     created_at: new Date().toISOString(),
-    actor: { id: process.env.SKILL_ACTOR ?? "human" },
+    // Authorship reflects the agent that generated this source, never a
+    // fabricated "human" default. A human semantic reviewer belongs in
+    // contract.provenance.human_review, not here — see BUG-2.
+    actor: { id: process.env.SKILL_ACTOR ?? `agent:${host}` },
     source_protocol_version: PROTOCOL_VERSION,
   };
 }
@@ -607,7 +622,9 @@ export async function compileWorkspace(
       endpoint: process.env.SKILL_ENDPOINT
         ? redactSecrets(process.env.SKILL_ENDPOINT)
         : undefined,
-      actors: [process.env.SKILL_ACTOR ?? "human"],
+      // Only pass explicit actor evidence — never fabricate one. mint()
+      // records attested:false and an empty actors list when this is unset.
+      actors: process.env.SKILL_ACTOR ? [process.env.SKILL_ACTOR] : undefined,
       agent_runtime: agentRuntime,
       agent_version: agentVersion,
     });

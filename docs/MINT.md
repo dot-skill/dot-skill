@@ -15,6 +15,13 @@ Required for minted skills. Includes:
 - `host_claim_binding`: `self_reported` | `verified_issuer`
 - `issuer_class`: `public_dev_hmac` | `configured_hmac` | `verified_issuer`
 - journey refs, optional `generation_usage` (tokens)
+- `human_approvals.actors` / **`human_approvals.attested`**: `actors` is only ever the
+  identity evidence a caller actually passed (`MintOptions.actors`); mint never fabricates
+  a default approver. When no evidence is provided, `actors` is `[]` and `attested` is
+  `false` — an explicit, inspectable "unattested" marker rather than a silent claim that a
+  human named "human" approved. Likewise `manifest.authors` (from `SkillSource.actor`)
+  reflects the agent that authored the skill (`agent:<host>` by default); a human semantic
+  reviewer only ever appears in `contract.provenance.human_review`, never as an author.
 
 ## Trust (not the same as “signed”)
 

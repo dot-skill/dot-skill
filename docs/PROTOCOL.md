@@ -60,6 +60,12 @@ provenance and never `verified_issuer` trust. Public-dev HMAC seals are
 labeled `development`. These fields do not prove that a named model performed
 the work — especially local LLMs.
 
+`manifest.authors` and `attestation.human_approvals` never fabricate a human
+identity: authorship defaults to `agent:<host>`, and approval evidence
+(`human_approvals.actors`) is empty with `attested: false` unless a caller
+actually supplied it. A human semantic reviewer is only ever recorded in
+`contract.provenance.human_review`. See [MINT.md](./MINT.md).
+
 ## Local workspace
 
 `.skill/` working tree: `sections/`, stage index, optional authored

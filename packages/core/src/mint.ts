@@ -243,7 +243,10 @@ export function mintSkillPackage(
       permissions: pkg.manifest.permissions
         .filter((p) => p.requires_consent)
         .map((p) => p.side_effect_class),
-      actors: opts.actors ?? ["human"],
+      // No actor evidence was fabricated: absent/empty opts.actors is recorded as
+      // attested:false, never silently defaulted to a claimed human approver.
+      actors: opts.actors ?? [],
+      attested: (opts.actors?.length ?? 0) > 0,
     },
     policy_profile: opts.policy_profile ?? "minted",
   };

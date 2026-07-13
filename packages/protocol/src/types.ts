@@ -343,7 +343,10 @@ export interface CreationAttestation {
   human_approvals: {
     inputs: string[];
     permissions: string[];
+    /** Empty when no actor evidence was provided — never fabricated. See `attested`. */
     actors: string[];
+    /** False when `actors` is empty: mint proceeded with no recorded human approver identity. */
+    attested: boolean;
   };
   policy_profile?: TrustProfile;
 }

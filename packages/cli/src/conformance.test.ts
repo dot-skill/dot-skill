@@ -910,6 +910,104 @@ test("mint seals package and verify-trust accepts development profile with expli
   );
 });
 
+test("BUG-2: mint never fabricates human approval evidence", () => {
+  const recipe = demoRecipe();
+  recipe.id = "rcp_bug2_mint";
+  let compiled = compileRecipeToSkill(recipe, {
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+    host: "cursor",
+    profile: "release",
+  });
+  compiled = approveCompilation(compiled, { inputs: ["*"], permissions: true });
+  compiled.files.manifest.needs_human_review = false;
+
+  // No actor evidence provided — must be an explicit "unattested" marker,
+  // never a silently fabricated ["human"].
+  const unattested = mintSkillPackage(compiled.files, { host: "cursor" });
+  assert.deepEqual(unattested.attestation.human_approvals.actors, []);
+  assert.equal(unattested.attestation.human_approvals.attested, false);
+
+  // Real actor evidence, when actually provided, is recorded as-is.
+  const attested = mintSkillPackage(compiled.files, {
+    host: "cursor",
+    actors: ["reviewer@example.com"],
+  });
+  assert.deepEqual(attested.attestation.human_approvals.actors, ["reviewer@example.com"]);
+  assert.equal(attested.attestation.human_approvals.attested, true);
+});
+
+test("BUG-2: workspace authorship reflects the agent, never a fabricated human default (SKILL_HOST=cursor)", async () => {
+  const { mkdtempSync } = await import("node:fs");
+  const dir = mkdtempSync(join(tmpdir(), "skill-ws-authorship-"));
+  const prev = process.cwd();
+  const prevHost = process.env.SKILL_HOST;
+  const prevActor = process.env.SKILL_ACTOR;
+  process.chdir(dir);
+  process.env.SKILL_HOST = "cursor";
+  delete process.env.SKILL_ACTOR;
+  try {
+    const { initWorkspace, proposeSection, setJourney, saveWorkspaceContract, checkpoint, compileWorkspace } =
+      await import("@skillerr/workspace");
+    await initWorkspace(dir, { title: "Authorship WS" });
+    await setJourney(dir, { summary: "Agent captures notes; no human actor identity supplied." });
+    await proposeSection(dir, { title: "Note", body: "Plain legacy text.", type: "doc" });
+
+    const cont = await checkpoint(dir, { message: "WIP" });
+    const contAuthors = cont.compile.files.manifest.authors;
+    assert.ok(contAuthors && contAuthors[0]!.id.startsWith("agent:"), JSON.stringify(contAuthors));
+    assert.notEqual(contAuthors![0]!.id, "human");
+
+    await saveWorkspaceContract(dir, demoContract());
+    const rel = await compileWorkspace(dir, { message: "Authorship WS", profile: "release", approve: true, mint: true });
+    const relAuthors = rel.compile.files.manifest.authors;
+    assert.ok(relAuthors && relAuthors[0]!.id.startsWith("agent:"), JSON.stringify(relAuthors));
+    assert.notEqual(relAuthors![0]!.id, "human");
+    // Minting without SKILL_ACTOR set must not fabricate an approver either.
+    assert.deepEqual(rel.compile.files.attestation?.human_approvals.actors, []);
+    assert.equal(rel.compile.files.attestation?.human_approvals.attested, false);
+  } finally {
+    process.chdir(prev);
+    if (prevHost === undefined) delete process.env.SKILL_HOST;
+    else process.env.SKILL_HOST = prevHost;
+    if (prevActor === undefined) delete process.env.SKILL_ACTOR;
+    else process.env.SKILL_ACTOR = prevActor;
+  }
+});
+
+test("BUG-2: a section file placed on disk with a non-agent source is rejected, not silently relabeled", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs");
+  const dir = mkdtempSync(join(tmpdir(), "skill-ws-badsource-"));
+  const prev = process.cwd();
+  const prevHost = process.env.SKILL_HOST;
+  process.chdir(dir);
+  process.env.SKILL_HOST = "cursor";
+  try {
+    const { initWorkspace, status } = await import("@skillerr/workspace");
+    await initWorkspace(dir, { title: "Bad Source WS" });
+    mkdirSync(join(dir, ".skill", "sections"), { recursive: true });
+    writeFileSync(
+      join(dir, ".skill", "sections", "sec_tampered.json"),
+      JSON.stringify({
+        kind: "section",
+        id: "sec_tampered",
+        type: "doc",
+        title: "Snuck in",
+        body: "Written directly to disk, not via skill propose.",
+        fidelity: "exact",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        source: "human",
+      }),
+    );
+    await assert.rejects(() => status(dir), /source="human", not "agent"/);
+  } finally {
+    process.chdir(prev);
+    if (prevHost === undefined) delete process.env.SKILL_HOST;
+    else process.env.SKILL_HOST = prevHost;
+  }
+});
+
 test("cannot mint with reserved non-agent host", () => {
   const recipe = demoRecipe();
   let compiled = compileRecipeToSkill(recipe, {
