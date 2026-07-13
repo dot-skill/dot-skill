@@ -108,6 +108,14 @@ example.skill
 - `redactSecrets()` skips pure hex runs (git SHAs, sha256/sha1 content digests) so
   they survive packaging unchanged; every other redaction is a `secret_redacted`
   entry in `compilation_report.issues`, never a silent content change
+- `unpackSkill` reads the archive through a streaming unzip so unsafe input is
+  refused *during* decompression, not after: a duplicate entry name (e.g. two
+  `skill.json`) is `duplicate_entry` the moment it's seen — its payload is
+  never even decompressed — and entry-count / uncompressed-size / compression-
+  ratio limits abort mid-stream instead of only being checked once a zip bomb
+  has already been fully inflated into memory. Every rejection is a distinct
+  `UnsafeZipError.code` (`duplicate_entry`, `too_many_entries`,
+  `uncompressed_size_exceeded`, `suspicious_compression_ratio`, …)
 
 ## Source adapters
 

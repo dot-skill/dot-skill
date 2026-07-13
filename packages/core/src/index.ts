@@ -22,6 +22,7 @@ export {
   finalizeManifest,
   packSkill,
   unpackSkill,
+  UnsafeZipError,
 } from "./pack.js";
 export type { PackOptions, UnpackResult } from "./pack.js";
 export {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { strToU8 } from "fflate";
 import {
   canonicalize,
   inspectSkill,
@@ -12,6 +13,7 @@ import {
   sha256Digest,
   sealedManifestDigest,
   unpackSkill,
+  UnsafeZipError,
   validatePackageBytes,
   mintSkillPackage,
   addPermanenceAnchor,
@@ -677,6 +679,111 @@ test("rejects path traversal in package build via normalize", () => {
       resources: { "../evil.txt": "nope" },
     });
   });
+});
+
+/**
+ * Builds a minimal hand-crafted zip using only stored (uncompressed) local
+ * file headers — no central directory. fflate's streaming Unzip parser
+ * (used by unpackSkill) scans for local file header signatures directly, so
+ * this is enough to exercise it, including adversarial cases (duplicate
+ * names) that packSkill's own API can never produce since it builds from a
+ * JS object where a repeated key can't exist.
+ */
+function rawStoredZip(entries: Array<{ name: string; data: string }>): Uint8Array {
+  const parts: Uint8Array[] = [];
+  for (const { name, data } of entries) {
+    const nameBytes = strToU8(name);
+    const dataBytes = strToU8(data);
+    const header = new Uint8Array(30);
+    const view = new DataView(header.buffer);
+    view.setUint32(0, 0x04034b50, true); // local file header signature
+    view.setUint16(4, 20, true); // version needed
+    view.setUint16(6, 0, true); // flags
+    view.setUint16(8, 0, true); // compression method: stored
+    view.setUint16(10, 0, true); // mod time
+    view.setUint16(12, 0, true); // mod date
+    view.setUint32(14, 0, true); // crc-32 (unchecked by UnzipPassThrough)
+    view.setUint32(18, dataBytes.length, true); // compressed size
+    view.setUint32(22, dataBytes.length, true); // uncompressed size
+    view.setUint16(26, nameBytes.length, true); // filename length
+    view.setUint16(28, 0, true); // extra field length
+    parts.push(header, nameBytes, dataBytes);
+  }
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const p of parts) {
+    out.set(p, offset);
+    offset += p.length;
+  }
+  return out;
+}
+
+test("SEC-D: unpackSkill rejects duplicate zip entries instead of silently last-one-winning", () => {
+  const archive = rawStoredZip([
+    { name: "skill.json", data: '{"kind":"dot-skill","id":"looks-benign"}' },
+    { name: "skill.json", data: '{"kind":"dot-skill","id":"actually-used"}' },
+  ]);
+  assert.throws(
+    () => unpackSkill(archive),
+    (error: unknown) => error instanceof UnsafeZipError && error.code === "duplicate_entry",
+  );
+});
+
+test("SEC-D: distinct entry names still unpack fine (no false positive)", () => {
+  const archive = rawStoredZip([
+    { name: "skill.json", data: '{"a":1}' },
+    { name: "workflow.json", data: '{"b":2}' },
+  ]);
+  const { files } = unpackSkill(archive);
+  assert.equal(Object.keys(files).length, 2);
+});
+
+test("SEC-D: too many zip entries is refused with a distinct code", () => {
+  const entries = Array.from({ length: 10_001 }, (_, i) => ({ name: `f${i}.txt`, data: "x" }));
+  const archive = rawStoredZip(entries);
+  assert.throws(
+    () => unpackSkill(archive),
+    (error: unknown) => error instanceof UnsafeZipError && error.code === "too_many_entries",
+  );
+});
+
+test("SEC-E: zip-bomb-style compression ratio is refused during decompression, not after", () => {
+  const bomb = packSkill({
+    manifest: {
+      kind: "dot-skill",
+      id: "skl_bomb",
+      version: "1.0.0",
+      title: "bomb",
+      description: "bomb",
+      container_version: CONTAINER_VERSION,
+      protocol_version: PROTOCOL_VERSION,
+      entrypoint: "s1",
+      inputs: [],
+      outputs: [],
+      capabilities: [],
+      permissions: [],
+      policy: { ...DEFAULT_SKILL_POLICY },
+      content: [],
+      package_digest: "sha256:" + "0".repeat(64),
+      provenance_mode: "proof_only",
+    },
+    workflow: {
+      kind: "workflow",
+      dialect_version: WORKFLOW_DIALECT_VERSION,
+      entrypoint: "s1",
+      steps: [{ id: "s1", kind: "instruct", text: "x" }],
+    },
+    knowledge: [],
+    // Highly repetitive content compresses far past MAX_COMPRESSION_RATIO
+    // while staying well under MAX_UNCOMPRESSED_BYTES — proves the ratio
+    // check fires mid-stream, not just the absolute-size ceiling.
+    resources: { "bomb.txt": "0".repeat(4_000_000) },
+  });
+  assert.throws(
+    () => unpackSkill(bomb),
+    (error: unknown) => error instanceof UnsafeZipError && error.code === "suspicious_compression_ratio",
+  );
 });
 
 test("legacy migrate marks needs_human_review", () => {

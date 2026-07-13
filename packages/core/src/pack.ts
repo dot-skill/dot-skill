@@ -1,4 +1,5 @@
-import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
+import { zipSync, strToU8, strFromU8, Unzip, UnzipInflate } from "fflate";
+import type { UnzipFile } from "fflate";
 import type {
   KnowledgeItem,
   SkillManifest,
@@ -14,6 +15,118 @@ import {
   MAX_UNCOMPRESSED_BYTES,
   normalizePath,
 } from "./paths.js";
+
+/** Every unsafe-zip refusal gets a distinct, machine-readable code (SEC-D/E, feeds SEC-L fixtures). */
+export class UnsafeZipError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "UnsafeZipError";
+    this.code = code;
+  }
+}
+
+function concatChunks(chunks: Uint8Array[], totalLength: number): Uint8Array {
+  const out = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+/**
+ * Streaming unzip with limits enforced incrementally during decompression,
+ * not after it.
+ *
+ * SEC-D: `unzipSync` returns a plain object, so a crafted archive with two
+ * entries of the same name (e.g. two `skill.json`) silently last-one-wins
+ * before any duplicate check ever runs — a parser-differential attack.
+ * fflate's streaming `Unzip` calls `onfile` for each local file header as
+ * it's parsed, in archive order, *before* decompressing that entry's data —
+ * duplicates are caught immediately, and the duplicate's payload is never
+ * even decompressed.
+ *
+ * SEC-E: feeding the archive to the decoder in fixed-size chunks (rather
+ * than one `unzipSync` call) means `ondata` fires incrementally as bytes
+ * decode, so entry-count/uncompressed-size/ratio limits can abort mid-stream
+ * — a zip bomb never gets fully inflated into memory before the DoS is
+ * caught.
+ */
+function unzipWithLimits(archive: Uint8Array): Record<string, Uint8Array> {
+  const seenNames = new Set<string>();
+  const result: Record<string, Uint8Array> = {};
+  let totalUncompressed = 0;
+  let entryCount = 0;
+  let aborted: UnsafeZipError | undefined;
+
+  const reader = new Unzip();
+  reader.register(UnzipInflate);
+  reader.onfile = (file: UnzipFile) => {
+    if (aborted) return;
+    if (seenNames.has(file.name)) {
+      aborted = new UnsafeZipError("duplicate_entry", `Duplicate zip entry: ${file.name}`);
+      return;
+    }
+    seenNames.add(file.name);
+    entryCount += 1;
+    if (entryCount > MAX_ENTRIES) {
+      aborted = new UnsafeZipError("too_many_entries", `Too many zip entries: ${entryCount}`);
+      return;
+    }
+    const chunks: Uint8Array[] = [];
+    let fileBytes = 0;
+    file.ondata = (err, chunk, final) => {
+      if (aborted) return;
+      if (err) {
+        aborted =
+          err instanceof UnsafeZipError
+            ? err
+            : new UnsafeZipError("inflate_error", err instanceof Error ? err.message : String(err));
+        return;
+      }
+      if (chunk && chunk.length) {
+        fileBytes += chunk.length;
+        totalUncompressed += chunk.length;
+        chunks.push(chunk);
+        if (totalUncompressed > MAX_UNCOMPRESSED_BYTES) {
+          aborted = new UnsafeZipError(
+            "uncompressed_size_exceeded",
+            "Uncompressed size exceeds limit",
+          );
+          file.terminate();
+          return;
+        }
+        const ratio = archive.byteLength > 0 ? totalUncompressed / archive.byteLength : 0;
+        if (ratio > MAX_COMPRESSION_RATIO && totalUncompressed > 1_000_000) {
+          aborted = new UnsafeZipError(
+            "suspicious_compression_ratio",
+            "Suspicious compression ratio",
+          );
+          file.terminate();
+          return;
+        }
+      }
+      if (final && !aborted) {
+        result[file.name] = concatChunks(chunks, fileBytes);
+      }
+    };
+    file.start();
+  };
+
+  const CHUNK_SIZE = 64 * 1024;
+  if (archive.length === 0) {
+    reader.push(archive, true);
+  } else {
+    for (let offset = 0; offset < archive.length && !aborted; offset += CHUNK_SIZE) {
+      const end = Math.min(offset + CHUNK_SIZE, archive.length);
+      reader.push(archive.subarray(offset, end), end >= archive.length);
+    }
+  }
+  if (aborted) throw aborted;
+  return result;
+}
 
 function toBytes(data: string | Uint8Array): Uint8Array {
   return typeof data === "string" ? strToU8(data) : data;
@@ -137,24 +250,13 @@ export interface UnpackResult {
 
 export function unpackSkill(archive: Uint8Array): UnpackResult {
   if (archive.byteLength > MAX_UNCOMPRESSED_BYTES * 2) {
-    throw new Error("Archive too large to unpack");
+    throw new UnsafeZipError("archive_too_large", "Archive too large to unpack");
   }
-  const unzipped = unzipSync(archive);
+  // Duplicate-entry rejection and entry-count/size/ratio limits are enforced
+  // incrementally inside unzipWithLimits (SEC-D/E) — never after the fact.
+  const unzipped = unzipWithLimits(archive);
   const paths = Object.keys(unzipped);
-  if (paths.length > MAX_ENTRIES) throw new Error("Too many zip entries");
   assertSafePaths(paths);
-
-  let uncompressed = 0;
-  for (const data of Object.values(unzipped)) {
-    uncompressed += data.byteLength;
-    if (uncompressed > MAX_UNCOMPRESSED_BYTES) {
-      throw new Error("Uncompressed size exceeds limit");
-    }
-    const ratio = archive.byteLength > 0 ? uncompressed / archive.byteLength : 0;
-    if (ratio > MAX_COMPRESSION_RATIO && uncompressed > 1_000_000) {
-      throw new Error("Suspicious compression ratio");
-    }
-  }
 
   const skillJson = unzipped["skill.json"];
   if (!skillJson) throw new Error("Missing skill.json");

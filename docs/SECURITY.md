@@ -3,7 +3,7 @@
 ## Practice
 
 - **Inspect before run** — `skill inspect --trust` shows TrustView (seal, issuer, host/model claims, digests) without compiling or feeding package body to a model
-- Validate before extract; reject traversal, symlinks, bombs, hash mismatch
+- Validate before extract; reject traversal, symlinks, bombs, hash mismatch, and duplicate zip entries — unpacking streams through the archive so bomb/duplicate checks abort mid-decompression rather than after a malicious archive has already been fully inflated
 - Secrets never embedded — references only
 - **Deny-by-default runtime** — undeclared network / filesystem / secret capabilities are refused; missing consent fails closed. This includes `read`: a declared `read` permission is required exactly like `write`/`destructive`
 - Network host allowlists match the parsed hostname exactly, or a `*.example.com` suffix — never a bare substring/prefix (`example.com` does not match `evil.com/?q=example.com` or `example.com.attacker.io`)
