@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { strToU8, strFromU8, zipSync } from "fflate";
@@ -10,6 +11,7 @@ import {
   migrateLegacySkill,
   normalizePath,
   packSkill,
+  PUBLIC_DEV_MINT_KEY,
   sha256Digest,
   sealedManifestDigest,
   unpackSkill,
@@ -1087,6 +1089,70 @@ test("SEC-F: after minting, manifest_digest matches sealed_manifest_digest", () 
   assert.equal(files.manifest.manifest_digest, files.manifest.sealed_manifest_digest);
   const validation = validatePackageBytes(packageBytes);
   assert.equal(validation.ok, true, JSON.stringify(validation.issues));
+});
+
+test("SEC-G: seal uses real HMAC-SHA256, not a naive concatenated hash", () => {
+  const recipe = demoRecipe();
+  recipe.id = "rcp_secg_hmac";
+  let compiled = compileRecipeToSkill(recipe, {
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+    host: "cursor",
+    profile: "release",
+  });
+  compiled = approveCompilation(compiled, { inputs: ["*"], permissions: true });
+  compiled.files.manifest.needs_human_review = false;
+  const { files } = mintSkillPackage(compiled.files, { host: "cursor" });
+
+  const dsse = files.signatures!["creation.dsse.json"] as {
+    payload_digest: string;
+    sig_alg: string;
+    signatures: Array<{ sig: string }>;
+  };
+  assert.equal(dsse.sig_alg, "hmac-sha256-v1");
+
+  const realHmac = createHmac("sha256", PUBLIC_DEV_MINT_KEY!)
+    .update(dsse.payload_digest)
+    .digest("hex");
+  const naiveConcatHash = sha256Digest(`${PUBLIC_DEV_MINT_KEY}:${dsse.payload_digest}`);
+  assert.equal(dsse.signatures[0]!.sig, realHmac);
+  assert.notEqual(dsse.signatures[0]!.sig, naiveConcatHash);
+});
+
+test("SEC-G: a legacy-style seal without sig_alg is refused as unsupported, not a generic mismatch", () => {
+  const recipe = demoRecipe();
+  recipe.id = "rcp_secg_legacy";
+  let compiled = compileRecipeToSkill(recipe, {
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+    host: "cursor",
+    profile: "release",
+  });
+  compiled = approveCompilation(compiled, { inputs: ["*"], permissions: true });
+  compiled.files.manifest.needs_human_review = false;
+  const { files } = mintSkillPackage(compiled.files, { host: "cursor" });
+
+  const unpacked = unpackSkill(packSkill(files));
+  const dsse = unpacked.raw.signatures!["creation.dsse.json"] as {
+    payload_digest: string;
+    sig_alg?: string;
+    signatures: Array<{ sig: string; keyid?: string }>;
+  };
+  // Simulate a seal from before SEC-G: naive concatenated hash, no sig_alg.
+  delete dsse.sig_alg;
+  dsse.signatures[0]!.sig = sha256Digest(`${PUBLIC_DEV_MINT_KEY}:${dsse.payload_digest}`);
+  const legacyBytes = packSkill(unpacked.raw);
+
+  const trust = verifyMintTrust(legacyBytes, "minted", {
+    allow_development_issuer: true,
+    allow_self_reported: true,
+  });
+  assert.equal(trust.ok, false);
+  assert.ok(
+    trust.issues.some((i) => i.code === "unsupported_seal_version"),
+    `expected unsupported_seal_version, got: ${JSON.stringify(trust.issues)}`,
+  );
+  assert.ok(!trust.issues.some((i) => i.code === "attestation_sig_invalid"));
 });
 
 test("mint seals package and verify-trust accepts development profile with explicit opt-in", () => {

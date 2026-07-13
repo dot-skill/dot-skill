@@ -38,6 +38,7 @@ export {
   addPermanenceAnchor,
   verifyMintTrust,
   inspectTrustView,
+  SEAL_ALGORITHM,
 } from "./mint.js";
 export type { MintOptions, VerifyMintTrustOptions } from "./mint.js";
 export {

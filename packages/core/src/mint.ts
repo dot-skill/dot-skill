@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type {
   CreationAttestation,
@@ -23,6 +24,22 @@ import {
 } from "./hash.js";
 import { packSkill, unpackSkill } from "./pack.js";
 import { validatePackageBytes, type ValidationIssue } from "./validate.js";
+
+/**
+ * SEC-G: the seal used to be `sha256(secret + ":" + payloadDigest)` — a
+ * naive concatenated hash, not a real MAC (vulnerable in general to
+ * length-extension-style reasoning about the hash function, and not an
+ * established construction the way HMAC is). Real HMAC-SHA256 now, and the
+ * envelope is explicitly versioned (`sig_alg`) so a seal produced by an
+ * older core version fails verification with a clear
+ * "unsupported/legacy algorithm" error instead of a generic signature
+ * mismatch that looks like tampering.
+ */
+export const SEAL_ALGORITHM = "hmac-sha256-v1" as const;
+
+function computeSeal(secret: string, payloadDigest: string): string {
+  return createHmac("sha256", secret).update(payloadDigest).digest("hex");
+}
 
 export interface MintOptions {
   host: string;
@@ -259,11 +276,12 @@ export function mintSkillPackage(
 
   const payload = canonicalize(attestation);
   const payloadDigest = sha256Digest(payload);
-  const sig = sha256Digest(`${secret}:${payloadDigest}`);
+  const sig = computeSeal(secret, payloadDigest);
 
   const dsse = {
     payloadType: "application/vnd.dot-skill.creation-attestation+json",
     payload_digest: payloadDigest,
+    sig_alg: SEAL_ALGORITHM,
     signatures: [{ keyid: attestation.agent.key_id, sig }],
     attestation,
   };
@@ -333,6 +351,7 @@ function extractAttestation(unpacked: ReturnType<typeof unpackSkill>): {
   envelope?: {
     attestation?: CreationAttestation;
     payload_digest?: string;
+    sig_alg?: string;
     signatures?: Array<{ sig: string; keyid?: string }>;
   };
 } {
@@ -340,6 +359,7 @@ function extractAttestation(unpacked: ReturnType<typeof unpackSkill>): {
     | {
         attestation?: CreationAttestation;
         payload_digest?: string;
+        sig_alg?: string;
         signatures?: Array<{ sig: string; keyid?: string }>;
       }
     | undefined;
@@ -495,8 +515,17 @@ export function verifyMintTrust(
           code: "issuer_secret_required",
           message: "Configured issuer seal requires a matching issuer_secret in the trust store",
         });
+      } else if (envelope?.sig_alg !== SEAL_ALGORITHM) {
+        // A seal from an older core version (pre real-HMAC) or a
+        // forged/unknown algorithm marker — fail with a clear, distinct
+        // reason rather than falling through to a generic sig mismatch.
+        issues.push({
+          severity: "error",
+          code: "unsupported_seal_version",
+          message: `Seal envelope sig_alg "${envelope?.sig_alg ?? "(none)"}" is not supported (expected "${SEAL_ALGORITHM}"). Re-mint with a current @skillerr/core version.`,
+        });
       } else {
-        const expected = sha256Digest(`${secret}:${payloadDigest}`);
+        const expected = computeSeal(secret, payloadDigest);
         const sig = envelope?.signatures?.[0]?.sig;
         if (sig !== expected) {
           issues.push({
@@ -522,7 +551,9 @@ export function verifyMintTrust(
     // open profile: still classify if a seal is present
     const payloadDigest = sha256Digest(canonicalize(attestation));
     const secret = opts.issuer_secret ?? PUBLIC_DEV_MINT_KEY;
-    signedOk = envelope.signatures[0].sig === sha256Digest(`${secret}:${payloadDigest}`);
+    signedOk =
+      envelope.sig_alg === SEAL_ALGORITHM &&
+      envelope.signatures[0].sig === computeSeal(secret, payloadDigest);
   }
 
   if (profile === "anchored") {

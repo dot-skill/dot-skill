@@ -38,6 +38,13 @@ Required for minted skills. Includes:
 
 Reference HMAC in this repo is **dev-only** — not production PKI. Humans exporting `SKILL_HOST` alone never get `verified_issuer`.
 
+The seal itself is real HMAC-SHA256 (`crypto.createHmac`), not a naive
+`sha256(secret + ":" + payloadDigest)` concatenation. The DSSE envelope
+carries an explicit `sig_alg` (currently `"hmac-sha256-v1"`); a seal missing
+it or carrying an unrecognized value is `unsupported_seal_version` on
+verify — a clear "old/foreign algorithm" refusal, not a generic signature
+mismatch that reads like ordinary tampering.
+
 ## Anti-spoof
 
 Mint refuses denylisted hosts (`human`, `cli`, `shell`, `manual`, …). Exporting `SKILL_HOST=cursor` (or any host id) alone never yields `verified_issuer` — that requires a configured issuer secret and verified host binding. Agent runtime markers strengthen the mint path but remain **locally spoofable**; env claims stay `self_reported` / `development` under the public-dev key. Workspace compile may still record a declared host; TrustView distinguishes self-reported vs verified issuer.
