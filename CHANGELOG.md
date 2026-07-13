@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2 — 2026-07-13
+
+- Ship Arcane Shimmer brand identity (cinematic banner + pixel skill-core mark) for Skillerr / `.skill`.
+- Supersedes provisional Dotling mark assets in README and the `skillerr` npm package.
+
 ## 0.6.1 — 2026-07-13
 
 - Ship Dotling brand mark assets in the public `skillerr` npm package.
