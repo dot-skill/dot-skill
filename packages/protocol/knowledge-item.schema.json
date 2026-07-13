@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillerr.com/schema/0.5/knowledge-item.schema.json",
+  "title": "Open .skill 0.5 knowledge item (knowledge/*.json)",
+  "type": "object",
+  "required": ["kind", "id", "type", "title", "body", "fidelity"],
+  "properties": {
+    "kind": { "const": "knowledge" },
+    "id": { "type": "string", "minLength": 1 },
+    "type": {
+      "enum": ["rule", "principle", "decision", "tradeoff", "correction", "lesson", "constraint", "reference"]
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "body": { "type": "string" },
+    "fidelity": { "enum": ["exact", "synthesize"] },
+    "applicability": { "type": "string" },
+    "pinned": { "type": "boolean" },
+    "sensitivity": { "enum": ["public", "private", "secret"] },
+    "provenance": { "type": "array" }
+  }
+}

@@ -1,3 +1,7 @@
+import type { ValidateFunction } from "ajv";
+// The base "ajv" export only understands draft-07; our schemas declare
+// $schema: draft/2020-12, which needs the dedicated 2020-12 build.
+import { Ajv2020 } from "ajv/dist/2020.js";
 import type { SkillManifest, Workflow } from "@skillerr/protocol";
 import {
   assessSkillContract,
@@ -6,9 +10,54 @@ import {
   WORKFLOW_DIALECT_VERSION,
   isValidHostPattern,
   isValidPathPattern,
+  loadSchema,
 } from "@skillerr/protocol";
 import { packageDigestFromContent, sealedManifestDigest, sha256Digest } from "./hash.js";
 import { unpackSkill } from "./pack.js";
+
+/**
+ * PROTO-7: JSON Schemas for every container file, compiled once and reused.
+ * `strict: false` because the schemas lean on allOf/if-then for the
+ * workflow step-kind union, which is valid draft 2020-12 but stricter than
+ * ajv's default "strict mode" heuristics care to allow.
+ */
+let schemaValidators:
+  | {
+      manifest: ValidateFunction;
+      workflow: ValidateFunction;
+      knowledgeItem: ValidateFunction;
+      creationAttestation: ValidateFunction;
+    }
+  | undefined;
+
+function getSchemaValidators(): NonNullable<typeof schemaValidators> {
+  if (!schemaValidators) {
+    const ajv = new Ajv2020({ allErrors: true, strict: false });
+    ajv.addSchema(loadSchema("skill-contract"));
+    schemaValidators = {
+      manifest: ajv.compile(loadSchema("skill-manifest")),
+      workflow: ajv.compile(loadSchema("workflow")),
+      knowledgeItem: ajv.compile(loadSchema("knowledge-item")),
+      creationAttestation: ajv.compile(loadSchema("creation-attestation")),
+    };
+  }
+  return schemaValidators;
+}
+
+function schemaIssues(
+  validate: ValidateFunction,
+  data: unknown,
+  code: string,
+  path?: string,
+): ValidationIssue[] {
+  if (validate(data)) return [];
+  return (validate.errors ?? []).map((e) => ({
+    severity: "error",
+    code,
+    message: `${e.instancePath || "(root)"} ${e.message ?? "failed schema validation"}`,
+    path,
+  }));
+}
 
 export interface ValidationIssue {
   severity: "error" | "warning";
@@ -26,6 +75,9 @@ export interface ValidationResult {
 
 export function validateManifestShape(manifest: SkillManifest): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  // PROTO-7: schema-check first — catches wrong types/enums/shapes the
+  // hand-written checks below don't (they mostly check presence/semantics).
+  issues.push(...schemaIssues(getSchemaValidators().manifest, manifest, "schema_manifest"));
   if (manifest.kind !== "dot-skill") {
     issues.push({ severity: "error", code: "kind", message: "kind must be dot-skill" });
   }
@@ -196,6 +248,7 @@ export function validateWorkflowShape(
   entrypoint: string,
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  issues.push(...schemaIssues(getSchemaValidators().workflow, workflow, "schema_workflow"));
   if (workflow.kind !== "workflow") {
     issues.push({ severity: "error", code: "workflow_kind", message: "kind must be workflow" });
   }
@@ -263,6 +316,20 @@ export function validatePackageBytes(archive: Uint8Array): ValidationResult {
 
   issues.push(...validateManifestShape(unpacked.manifest));
   issues.push(...validateWorkflowShape(unpacked.workflow, unpacked.manifest.entrypoint));
+
+  // PROTO-7: schema-check every knowledge item and the DSSE creation
+  // attestation envelope too — the two container file kinds that don't
+  // have a dedicated top-level validate*Shape() function of their own.
+  const validators = getSchemaValidators();
+  for (const item of unpacked.knowledge) {
+    issues.push(...schemaIssues(validators.knowledgeItem, item, "schema_knowledge_item", item.id));
+  }
+  const dsseEnvelope = unpacked.raw.signatures?.["creation.dsse.json"];
+  if (dsseEnvelope) {
+    issues.push(
+      ...schemaIssues(validators.creationAttestation, dsseEnvelope, "schema_creation_attestation"),
+    );
+  }
 
   const computed: Array<{ path: string; digest: string }> = [];
   for (const [path, data] of Object.entries(unpacked.files)) {

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillerr.com/schema/0.5/workflow.schema.json",
+  "title": "Open .skill 0.5 workflow (workflow.json)",
+  "type": "object",
+  "required": ["kind", "dialect_version", "entrypoint", "steps"],
+  "properties": {
+    "kind": { "const": "workflow" },
+    "dialect_version": { "type": "string" },
+    "entrypoint": { "type": "string", "minLength": 1 },
+    "steps": { "type": "array", "items": { "$ref": "#/$defs/workflowStep" } },
+    "constraints": { "type": "array", "items": { "type": "object" } },
+    "preconditions": { "type": "object" },
+    "branches": { "type": "object" },
+    "human_decisions": { "type": "object" },
+    "recovery": { "type": "object" },
+    "verification": { "type": "object" }
+  },
+  "$defs": {
+    "stepBase": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": {
+          "enum": [
+            "instruct", "prompt", "tool", "transform", "branch", "iterate",
+            "delegate", "checkpoint", "human_decision", "verify", "emit", "subskill"
+          ]
+        },
+        "title": { "type": "string" },
+        "optional": { "type": "boolean" },
+        "next": { "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }] },
+        "on_fail": { "type": "string" },
+        "provenance": { "type": "array" }
+      }
+    },
+    "workflowStep": {
+      "allOf": [
+        { "$ref": "#/$defs/stepBase" },
+        {
+          "if": { "properties": { "kind": { "const": "instruct" } } },
+          "then": { "required": ["text"], "properties": { "text": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "prompt" } } },
+          "then": { "required": ["template"], "properties": { "template": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "tool" } } },
+          "then": { "required": ["capability"], "properties": { "capability": { "type": "string", "minLength": 1 } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "transform" } } },
+          "then": { "required": ["expression"], "properties": { "expression": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "branch" } } },
+          "then": {
+            "required": ["cases"],
+            "properties": {
+              "cases": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["when", "goto"],
+                  "properties": { "when": { "type": "string" }, "goto": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "iterate" } } },
+          "then": {
+            "required": ["over", "as", "body"],
+            "properties": {
+              "over": { "type": "string" },
+              "as": { "type": "string" },
+              "body": { "type": "string" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "delegate" } } },
+          "then": { "required": ["task"], "properties": { "task": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "human_decision" } } },
+          "then": { "required": ["prompt"], "properties": { "prompt": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "verify" } } },
+          "then": {
+            "required": ["assertions"],
+            "properties": { "assertions": { "type": "array", "items": { "type": "string" } } }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "emit" } } },
+          "then": {
+            "required": ["output", "from"],
+            "properties": { "output": { "type": "string" }, "from": { "type": "string" } }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "subskill" } } },
+          "then": { "required": ["skill_id"], "properties": { "skill_id": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    }
+  }
+}

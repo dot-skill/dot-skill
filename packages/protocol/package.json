@@ -36,6 +36,10 @@
     "!dist/**/*.test.js",
     "!dist/**/*.test.d.ts",
     "skill-contract.schema.json",
+    "skill-manifest.schema.json",
+    "workflow.schema.json",
+    "knowledge-item.schema.json",
+    "creation-attestation.schema.json",
     "README.md",
     "LICENSE"
   ],
@@ -44,7 +48,11 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./skill-contract.schema.json": "./skill-contract.schema.json"
+    "./skill-contract.schema.json": "./skill-contract.schema.json",
+    "./skill-manifest.schema.json": "./skill-manifest.schema.json",
+    "./workflow.schema.json": "./workflow.schema.json",
+    "./knowledge-item.schema.json": "./knowledge-item.schema.json",
+    "./creation-attestation.schema.json": "./creation-attestation.schema.json"
   },
   "scripts": {
     "build": "rimraf dist && tsc",

@@ -22,6 +22,9 @@ Status: protocol **Draft 0.5.0**; reference packages **0.6.0**.
 - [x] Structured permission grammar for `permission.hosts`/`.paths`
       (`@skillerr/protocol`'s `isValidHostPattern`/`isValidPathPattern`),
       validated at both contract-authoring and manifest-validation time
+- [x] JSON Schemas (draft 2020-12) for every container file — contract,
+      manifest, workflow, knowledge items, DSSE attestation — checked by
+      `skill validate` via `@skillerr/protocol`'s `loadSchema()`
 
 ## Next (great contribution targets)
 

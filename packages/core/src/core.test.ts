@@ -11,6 +11,7 @@ import { canonicalize, sha256Digest, sha256Hex, packageDigestFromContent } from 
 import { normalizePath, assertSafePaths, UnsafePathError } from "./paths.js";
 import { packSkill, unpackSkill } from "./pack.js";
 import { mintSkillPackage, verifyMintTrust } from "./mint.js";
+import { validatePackageBytes } from "./validate.js";
 import { compileSkillSource, approveCompilation } from "./compile.js";
 import {
   DEFAULT_SKILL_POLICY,
@@ -139,6 +140,42 @@ test("pack/unpack: round-trips manifest, workflow, and knowledge unchanged", () 
   assert.equal(unpacked.knowledge[0]!.body, "Always be polite.");
   // manifest_digest (SEC-F) is computed at pack time and must self-verify.
   assert.ok(unpacked.manifest.manifest_digest);
+});
+
+test("PROTO-7: a well-formed package validates clean against the JSON Schemas", () => {
+  const pkg = minimalPackage();
+  pkg.knowledge = [
+    { kind: "knowledge", id: "k1", type: "rule", title: "Rule", body: "Be polite.", fidelity: "exact" },
+  ];
+  const validation = validatePackageBytes(packSkill(pkg));
+  assert.equal(validation.ok, true, JSON.stringify(validation.issues));
+  assert.ok(!validation.issues.some((i) => i.code.startsWith("schema_")));
+});
+
+test("PROTO-7: schema-check catches a wrong field type the hand-written checks alone don't", () => {
+  const pkg = minimalPackage();
+  // A number where the schema (and the real type) require a string. None of
+  // validateManifestShape's hand-written checks type-check `version` at
+  // all — they only check truthiness — so before PROTO-7 this passed
+  // silently.
+  (pkg.manifest as unknown as Record<string, unknown>).version = 42;
+  const validation = validatePackageBytes(packSkill(pkg));
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some((i) => i.code === "schema_manifest" && i.message.includes("version")),
+    JSON.stringify(validation.issues),
+  );
+});
+
+test("PROTO-7: schema-check catches a knowledge item missing a required field", () => {
+  const pkg = minimalPackage();
+  pkg.knowledge = [
+    // Missing `fidelity`, required by knowledge-item.schema.json.
+    { kind: "knowledge", id: "k1", type: "rule", title: "Rule", body: "x" } as never,
+  ];
+  const validation = validatePackageBytes(packSkill(pkg));
+  assert.equal(validation.ok, false);
+  assert.ok(validation.issues.some((i) => i.code === "schema_knowledge_item"));
 });
 
 function validContract(): SkillContract {

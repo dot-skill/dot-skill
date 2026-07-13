@@ -88,6 +88,22 @@ example.skill
 └── signatures/          # attestation + optional anchors
 ```
 
+### JSON Schemas (PROTO-7)
+
+Every structured container file has a published draft 2020-12 JSON Schema
+under `packages/protocol/`, and `skill validate` checks each entry against
+its schema (not just the hand-written required-field checks that predate
+this): `skill-contract.schema.json`, `skill-manifest.schema.json`
+(`skill.json`), `workflow.schema.json` (`workflow.json`, with a step-kind
+union covering all 12 kinds), `knowledge-item.schema.json` (each
+`knowledge/*.json`), and `creation-attestation.schema.json`
+(`signatures/creation.dsse.json`). A schema failure is a `schema_*` issue
+code (`schema_manifest`, `schema_workflow`, `schema_knowledge_item`,
+`schema_creation_attestation`) alongside the existing semantic checks. Load
+them at runtime via `@skillerr/protocol`'s `loadSchema(name)` rather than a
+raw file path, so the lookup works the same whether the package is a
+workspace symlink or an installed npm dependency.
+
 ## Permission grammar (PROTO-5)
 
 `permission.hosts` and `permission.paths` are not bare ad hoc strings —

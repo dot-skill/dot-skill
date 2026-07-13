@@ -90,6 +90,9 @@ export {
 
 export { isValidHostPattern, isValidPathPattern } from "./grammar.js";
 
+export { loadSchema } from "./schemas.js";
+export type { SchemaName } from "./schemas.js";
+
 export {
   extractSkillCandidates,
   segmentJourney,

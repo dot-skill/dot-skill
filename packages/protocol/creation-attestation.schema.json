@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillerr.com/schema/0.5/creation-attestation.schema.json",
+  "title": "Open .skill 0.5 creation attestation (signatures/creation.dsse.json)",
+  "type": "object",
+  "required": ["payloadType", "payload_digest", "signatures", "attestation"],
+  "properties": {
+    "payloadType": { "type": "string" },
+    "payload_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "sig_alg": { "type": "string" },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["sig"],
+        "properties": {
+          "sig": { "type": "string", "minLength": 1 },
+          "keyid": { "type": "string" }
+        }
+      }
+    },
+    "attestation": { "$ref": "#/$defs/creationAttestation" }
+  },
+  "$defs": {
+    "creationAttestation": {
+      "type": "object",
+      "required": [
+        "kind",
+        "package_digest",
+        "sealed_manifest_digest",
+        "skill_id",
+        "skill_version",
+        "minted_at",
+        "agent",
+        "host",
+        "host_claim_binding",
+        "issuer_class",
+        "journey",
+        "human_approvals"
+      ],
+      "properties": {
+        "kind": { "const": "creation_attestation" },
+        "package_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "sealed_manifest_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "skill_id": { "type": "string", "minLength": 1 },
+        "skill_version": { "type": "string", "minLength": 1 },
+        "minted_at": { "type": "string" },
+        "agent": {
+          "type": "object",
+          "required": ["runtime", "version"],
+          "properties": {
+            "runtime": { "type": "string" },
+            "version": { "type": "string" },
+            "key_id": { "type": "string" }
+          }
+        },
+        "host": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string" },
+        "model": { "type": "string" },
+        "deployment": { "enum": ["local", "hosted", "hybrid", "unknown"] },
+        "endpoint": { "type": "string" },
+        "host_claim_binding": { "enum": ["self_reported", "verified_issuer"] },
+        "issuer_class": { "enum": ["public_dev_hmac", "configured_hmac", "verified_issuer"] },
+        "agent_runtime_markers": { "type": "array", "items": { "type": "string" } },
+        "journey": {
+          "type": "object",
+          "properties": {
+            "recipe_id": { "type": "string" },
+            "recipe_hash": { "type": "string" },
+            "source_id": { "type": "string" },
+            "source_hash": { "type": "string" },
+            "proof_digest": { "type": "string" },
+            "summary": { "type": "string" }
+          }
+        },
+        "generation_usage": { "type": "object" },
+        "human_approvals": {
+          "type": "object",
+          "required": ["inputs", "permissions", "actors", "attested"],
+          "properties": {
+            "inputs": { "type": "array", "items": { "type": "string" } },
+            "permissions": { "type": "array", "items": { "type": "string" } },
+            "actors": { "type": "array", "items": { "type": "string" } },
+            "attested": { "type": "boolean" }
+          }
+        },
+        "policy_profile": { "type": "string" }
+      }
+    }
+  }
+}
