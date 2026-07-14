@@ -105,6 +105,25 @@ export function assessClaims(view: TrustView, opts: AssessClaimsOptions = {}): C
     });
   }
 
+  // License is never bound by host_claim_binding — unlike agent identity
+  // claims, there's no runtime-evidence path that makes a license
+  // declaration independently checkable. Always self-reported, like npm's
+  // package.json license field.
+  if (view.license) {
+    self_reported.push({
+      field: "license",
+      value: view.license,
+      note: "self-reported, like npm's package.json license field — nothing here verifies the declared license matches reality or that the declarer has the right to set it",
+    });
+  }
+  if (view.license_url) {
+    self_reported.push({
+      field: "license_url",
+      value: view.license_url,
+      note: "self-reported alongside license — not verified to actually resolve to matching terms",
+    });
+  }
+
   const hostBound = view.host_claim_binding === "verified_issuer";
   const agentFields: Array<[string, string | undefined]> = [
     ["agent.host", view.agent?.host],

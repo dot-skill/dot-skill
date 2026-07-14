@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.10 — 2026-07-15
+
+Found while doing end-to-end verification of 0.9.9's license field
+against a fresh npm install: `license`/`license_url` reached
+`manifest`/`skill inspect`'s plain summary correctly, but never made
+it into `TrustView` — meaning `skill inspect --trust`, `skill
+verify-trust`, `assessClaims`'s self-reported list, and by extension
+`www.skillerr.com`'s verify page never showed it at all. Added
+`license`/`license_url` to `TrustView`, populated in
+`inspectTrustView`, and added both to `assessClaims`'s self-reported
+list (never verified — same reasoning as every other self-reported
+field: nothing in this protocol checks a declared license matches
+reality).
+
 ## 0.9.9 — 2026-07-15
 
 Phase F, scoped down to what actually belongs in this repo: a

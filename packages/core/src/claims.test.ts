@@ -110,6 +110,50 @@ test("PHASE E2: assessClaims on a development (public-dev HMAC) mint — digests
   assert.equal(findField(claims.verified, "agent.host"), undefined, "agent.host must never also appear as verified");
 });
 
+test("PHASE E2/Phase F: assessClaims puts license/license_url in self_reported, never verified, regardless of trust_state", () => {
+  const contract = validContract();
+  const source: SkillSource = {
+    kind: "skill_source",
+    id: "src_claims_license",
+    hash: "sha256:" + "f".repeat(64),
+    title: contract.title,
+    contract,
+    sections: [],
+    steering: [],
+    prompts: [],
+    code_refs: [],
+    parents: [],
+    agent: { host: "cursor" },
+    journey: { summary: "License claims fixture.", redacted: true, sensitivity: "private" },
+    inputs_declared: "none",
+    sensitivity: "private",
+    created_at: "2026-07-13T00:00:00.000Z",
+    actor: { id: "test-agent" },
+    source_protocol_version: PROTOCOL_VERSION,
+    license: "Apache-2.0",
+    license_url: "https://example.test/terms",
+  };
+  const compiled = compileSkillSource(source, {
+    profile: "release",
+    approve_inferred_inputs: true,
+    approve_permissions: true,
+  });
+  const approved = approveCompilation(compiled, { inputs: ["*"], permissions: true });
+  approved.files.manifest.needs_human_review = false;
+  const sealed = mintSkillPackage(approved.files, { host: "cursor" });
+
+  const view = inspectTrustView(sealed.packageBytes);
+  assert.equal(view.license, "Apache-2.0");
+  assert.equal(view.license_url, "https://example.test/terms");
+
+  const claims = assessClaims(view);
+  const licenseClaim = findField(claims.self_reported, "license");
+  assert.ok(licenseClaim, "license must be self-reported");
+  assert.equal(licenseClaim!.value, "Apache-2.0");
+  assert.ok(findField(claims.self_reported, "license_url"), "license_url must be self-reported");
+  assert.equal(findField(claims.verified, "license"), undefined, "license must never appear as verified");
+});
+
 test("PHASE E2: assessClaims on a verified_issuer mint — issuer AND agent.host both verified (real runtime evidence present)", () => {
   const files = buildApprovedFiles("verified");
   const { privateKey, publicKey } = generateKeyPairSync("ed25519", {

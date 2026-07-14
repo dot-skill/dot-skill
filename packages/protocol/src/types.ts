@@ -378,6 +378,8 @@ export interface TrustView {
   package_digest: string;
   sealed_manifest_digest?: string;
   attestation_digest?: string;
+  license?: string;
+  license_url?: string;
   label: string;
   warnings: string[];
   issues: Array<{ severity: "error" | "warning"; code: string; message: string }>;

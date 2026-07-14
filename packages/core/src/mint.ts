@@ -775,6 +775,8 @@ export function inspectTrustView(archive: Uint8Array, opts?: { trust_store?: Tru
     package_digest: m.package_digest,
     sealed_manifest_digest: attestation?.sealed_manifest_digest ?? m.sealed_manifest_digest ?? expectedSealed,
     attestation_digest: m.attestation_digest,
+    license: m.license,
+    license_url: m.license_url,
     label,
     warnings,
     issues: base.issues,
