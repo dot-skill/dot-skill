@@ -1,6 +1,6 @@
 {
   "name": "@skillerr/protocol",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "Types, schemas, and completeness rules for portable .skill packages",
   "license": "MIT",
   "author": {
