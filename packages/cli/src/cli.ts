@@ -47,6 +47,7 @@ import {
   anchorToRekor,
   verifyRekorAnchor,
   checkRekorOnline,
+  rekorSearchUrl,
 } from "@skillerr/core";
 import type { GradeOverride } from "@skillerr/core";
 import { buildSkillAssessment } from "./score-adapter.js";
@@ -146,7 +147,10 @@ Create:
                                        (requires --signer-key; default log is the
                                        public rekor.sigstore.dev — PERMANENT and
                                        WORLD-READABLE once logged, never anchor a
-                                       secret skill). See docs/TRANSPARENCY.md
+                                       secret skill). Prints a search.sigstore.dev
+                                       link so anyone can check the entry
+                                       independently, not just trust this tool's
+                                       word. See docs/TRANSPARENCY.md
   skill keygen [-o dir] [--key-id id]  Generate an Ed25519 issuer keypair for
                                        production signing (docs/KEY-CEREMONY.md)
 
@@ -186,7 +190,10 @@ Ingest / run:
                                        Default trust store: ~/.skillerr/trust-store.json
                                        If the package has a transparency_log anchor,
                                        verifies its Rekor inclusion proof offline
-                                       (no network) against the pinned issuer key.
+                                       (no network) against the pinned issuer key,
+                                       and (if verified, and logged to the public
+                                       instance) prints a search.sigstore.dev link
+                                       so you can check the same entry yourself.
                                        --online additionally re-fetches the entry
                                        live from Rekor as an extra check
   skill run <file.skill> [--mode execute] [--allow-untrusted]
@@ -692,14 +699,21 @@ async function main() {
         } else {
           try {
             const publicKeyPem = derivePublicKeyPem(signerKeyPem!);
-            const { anchor } = await anchorToRekor(attestation.sealed_manifest_digest, signer, publicKeyPem, {
+            const { anchor, log_index } = await anchorToRekor(attestation.sealed_manifest_digest, signer, publicKeyPem, {
               rekorUrl: opt(rest, "--rekor-url"),
             });
             packageBytes = addPermanenceAnchor(packageBytes, {
               ...anchor,
               package_digest: files.manifest.package_digest,
             });
-            transparency = { ok: true, located_at: anchor.located_at, anchored_at: anchor.anchored_at };
+            transparency = {
+              ok: true,
+              located_at: anchor.located_at,
+              anchored_at: anchor.anchored_at,
+              log_index,
+              // Independently checkable on sigstore's own UI — don't just take our word for it.
+              rekor_url: rekorSearchUrl(anchor, log_index),
+            };
           } catch (e) {
             // Anchoring is additive — a network/Rekor failure never discards
             // an already-valid mint, it's just reported honestly.
@@ -1099,11 +1113,17 @@ async function main() {
             result.attestation.sealed_manifest_digest,
             pinnedKey.public_key_pem,
           );
+          // Independently checkable on sigstore's own UI — don't just take
+          // our word for it. undefined (not a guessed link) unless the
+          // anchor verified AND lives on the public Rekor instance.
+          const withUrl = offline.ok
+            ? { ...offline, rekor_url: rekorSearchUrl(tlogAnchor, offline.log_index) }
+            : offline;
           if (flag(rest, "--online") && offline.log_index) {
             const online = await checkRekorOnline(offline.log_index, tlogAnchor.located_at);
-            transparency = { ...offline, online_check: online };
+            transparency = { ...withUrl, online_check: online };
           } else {
-            transparency = offline;
+            transparency = withUrl;
           }
         }
       }

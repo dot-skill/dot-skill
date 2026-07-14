@@ -33,6 +33,8 @@ export interface TransparencyOptions {
 
 export interface TransparencyAnchorResult {
   anchor: Omit<PermanenceAnchor, "package_digest">;
+  /** Rekor's log index for the entry just created — callers use this with `rekorSearchUrl` to hand back an independently-checkable link. */
+  log_index: string;
 }
 
 /** Adapts our existing `IssuerSigner` (signs a digest *string*) to sigstore-js's `Signer` (signs artifact *bytes*). */
@@ -98,6 +100,7 @@ export async function anchorToRekor(
       issuer: issuerSigner.key_id,
       receipt: bundleToJSON(bundle),
     },
+    log_index: String(tlogEntry.logIndex),
   };
 }
 
@@ -169,6 +172,31 @@ export async function verifyRekorAnchor(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** The only Rekor instance `search.sigstore.dev` actually indexes. */
+const PUBLIC_REKOR_URL = "https://rekor.sigstore.dev";
+
+/**
+ * Builds a link to Rekor's public search UI for a verified anchor, so a
+ * user doesn't have to take our word for a trust verdict — they can look
+ * the same log entry up on sigstore's own site.
+ *
+ * Deliberately returns `undefined` (not a guessed/best-effort link) when
+ * the anchor was logged to anything other than the public good instance:
+ * `search.sigstore.dev` only indexes `rekor.sigstore.dev`, so a link built
+ * for a self-hosted Rekor would point at an index that doesn't contain the
+ * entry — a broken link is worse than no link, since it implies a check
+ * that can't actually happen.
+ */
+export function rekorSearchUrl(
+  anchor: Pick<PermanenceAnchor, "kind" | "located_at">,
+  logIndex: string | undefined,
+): string | undefined {
+  if (anchor.kind !== "transparency_log" || anchor.located_at !== PUBLIC_REKOR_URL || !logIndex) {
+    return undefined;
+  }
+  return `https://search.sigstore.dev/?logIndex=${encodeURIComponent(logIndex)}`;
 }
 
 /**

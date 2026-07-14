@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.9.6 — 2026-07-14
+
+Independent Rekor verification, everywhere a trust verdict is shown.
+Neither the CLI nor `www.skillerr.com`'s verify page should be able to
+tell you "this is verified" without also handing you a way to check
+that for yourself. New `rekorSearchUrl()` in `@skillerr/core` builds a
+`search.sigstore.dev` link for a verified `transparency_log` anchor —
+deliberately `undefined` (not a guessed/broken link) unless the anchor
+is on the public `rekor.sigstore.dev` instance, since a self-hosted
+Rekor has no public search UI.
+
+- `skill mint --transparency` now prints the link the moment an anchor
+  is created; `skill verify-trust` prints it every time it re-verifies
+  one (the more common moment, since verification happens far more
+  often than minting).
+- `anchorToRekor()` now returns `log_index` directly (it already had
+  the data internally) instead of callers needing to re-parse the
+  receipt bundle.
+- Also fixed two stale claims in `docs/TRANSPARENCY.md` found while
+  editing it: it named `MessageSignatureBundleBuilder` (the actual
+  implementation uses `DSSEBundleBuilder`, changed earlier for
+  Ed25519/Rekor compatibility — see the `## Verification` section),
+  and described `--keyless`/Fulcio in the present tense as if already
+  shipped, when it isn't (`docs/ROADMAP.md` and
+  `docs/WHAT-IS-VERIFIABLE.md` already correctly tracked it as
+  planned — this doc alone was out of sync).
+
 ## 0.9.5 — 2026-07-14
 
 `@skillerr/protocol`'s `loadSchema()` read its JSON Schema files via
