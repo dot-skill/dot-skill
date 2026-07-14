@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.5 — 2026-07-14
+
+`@skillerr/protocol`'s `loadSchema()` read its JSON Schema files via
+`new URL(relativePath, import.meta.url)` where `relativePath` came out
+of a lookup object — a variable, not a literal, at the call site. That
+defeats static file-tracing bundlers (e.g. Vercel's `@vercel/nft`, used
+to decide which files ship with a serverless function): they recognize
+`new URL('./literal.json', import.meta.url)` as an asset reference only
+when the path is an inline literal. Any bundled consumer of
+`@skillerr/protocol` doing schema validation was silently missing these
+files in production. Rewrote each schema path as its own literal
+`new URL(...)` call site; the JSON files themselves haven't moved.
+
 ## 0.9.4 — 2026-07-14
 
 `www.skillerr.com` is now live (Vercel) — docs served at `/docs/`, the
