@@ -16,7 +16,7 @@ import { TrustedRoot } from "@sigstore/protobuf-specs";
 import type { Witness } from "@sigstore/sign";
 import type { TransparencyLogEntry } from "@sigstore/bundle";
 import { createEd25519Signer } from "./signer.js";
-import { anchorToRekor, verifyRekorAnchor } from "./transparency.js";
+import { anchorToRekor, verifyRekorAnchor, rekorSearchUrl } from "./transparency.js";
 import type { PermanenceAnchor } from "@skillerr/protocol";
 
 const fixturePath = fileURLToPath(
@@ -58,7 +58,7 @@ test("PHASE E: anchorToRekor builds a transparency_log PermanenceAnchor from a w
   const signer = createEd25519Signer(privateKey, "test-issuer-key");
   const digest = "sha256:" + "d".repeat(64);
 
-  const { anchor } = await anchorToRekor(digest, signer, publicKey, {
+  const { anchor, log_index } = await anchorToRekor(digest, signer, publicKey, {
     witness: stubWitness(),
     rekorUrl: "https://example-rekor.test",
   });
@@ -68,6 +68,7 @@ test("PHASE E: anchorToRekor builds a transparency_log PermanenceAnchor from a w
   assert.equal(anchor.issuer, "test-issuer-key");
   assert.equal(anchor.anchored_at, new Date(1700000000 * 1000).toISOString());
   assert.ok(anchor.receipt, "receipt must be present");
+  assert.equal(log_index, "42");
 });
 
 test("PHASE E: anchorToRekor defaults to the public Rekor URL when none is given", async () => {
@@ -138,4 +139,27 @@ test("PHASE E: verifyRekorAnchor rejects a non-transparency_log anchor kind with
   );
   assert.equal(result.ok, false);
   assert.match(result.error ?? "", /Not a transparency_log anchor/);
+});
+
+test("PHASE E: rekorSearchUrl builds a search.sigstore.dev link for an anchor on the public Rekor instance", () => {
+  const url = rekorSearchUrl(fixture.anchor as PermanenceAnchor, "2168036243");
+  assert.equal(url, "https://search.sigstore.dev/?logIndex=2168036243");
+});
+
+test("PHASE E: rekorSearchUrl returns undefined for a self-hosted (non-public) Rekor instance", () => {
+  const url = rekorSearchUrl(
+    { kind: "transparency_log", located_at: "https://rekor.example-internal.corp" },
+    "2168036243",
+  );
+  assert.equal(url, undefined);
+});
+
+test("PHASE E: rekorSearchUrl returns undefined when there's no log index (e.g. verification failed before an entry was found)", () => {
+  const url = rekorSearchUrl(fixture.anchor as PermanenceAnchor, undefined);
+  assert.equal(url, undefined);
+});
+
+test("PHASE E: rekorSearchUrl returns undefined for a non-transparency_log anchor kind", () => {
+  const url = rekorSearchUrl({ kind: "registry", located_at: "https://rekor.sigstore.dev" }, "123");
+  assert.equal(url, undefined);
 });

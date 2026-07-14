@@ -8,7 +8,7 @@ An append-only transparency log with inclusion proofs is exactly what [Rekor](ht
 
 ## What gets logged
 
-When you mint with `--transparency`, the **`sealed_manifest_digest`** (the same string `mintSkillPackage` already signs today — see [MINT.md](./MINT.md)) is submitted to Rekor as a `MessageSignatureBundleBuilder` artifact:
+When you mint with `--transparency`, the **`sealed_manifest_digest`** (the same string `mintSkillPackage` already signs today — see [MINT.md](./MINT.md)) is submitted to Rekor as a `DSSEBundleBuilder` artifact (not `MessageSignatureBundleBuilder` — that path hardcodes a SHA-256 hashedrekord entry, which is incompatible with Rekor's Ed25519ph requirement for Ed25519 signatures; confirmed against the real public instance):
 
 1. Our existing issuer signer (`configured_ed25519`, or the public-dev HMAC path — see below) signs the digest exactly as it always has.
 2. `RekorWitness` submits the resulting signature + public key to Rekor, which returns a `TransparencyLogEntry`: `logIndex`, `integratedTime`, `logID`, an `inclusionProof` (Merkle path to the signed tree head), and a `signedEntryTimestamp` (SET).
@@ -30,11 +30,21 @@ Default is the public instance (`rekor.sigstore.dev`) — free, world-readable, 
 
 `skill verify-trust` checks a transparency anchor the same way `cosign verify-blob --bundle` does: the inclusion proof and SET are self-contained cryptographic evidence inside the anchor's `receipt` — verifying them requires Rekor's public key (a well-known constant, part of Sigstore's public trust root) but **not a live network call**. `--online` additionally re-queries Rekor directly, which catches the one thing offline verification can't (a log that's since been proven inconsistent/forked — extremely rare, but the option exists).
 
-## Optional keyless (Fulcio) signing
+## Independent verification: a link to Rekor's own UI, not just our word
 
-`--keyless` swaps the signer: instead of your own `configured_ed25519` key, an ephemeral keypair is generated locally and Fulcio issues a short-lived certificate binding it to your OIDC identity (GitHub, Google, etc.) for the few seconds it takes to sign and log. The resulting `owner_identity` is then a real, independently-checkable OIDC identity rather than an opaque key someone told you to trust — see [WHAT-IS-VERIFIABLE.md](./WHAT-IS-VERIFIABLE.md)'s "key-bound, but requires you to already trust the key" section for why this is a meaningfully stronger claim than a bare pinned key.
+Neither the CLI nor `www.skillerr.com`'s verify page ask you to trust their own "verified" output on faith. When a `transparency_log` anchor is present and verifies against the pinned issuer key — and it's logged to the public `rekor.sigstore.dev` instance (a self-hosted log has no public search UI, so no link is fabricated for it) — both surfaces hand back a `https://search.sigstore.dev/?logIndex=<n>` link:
 
-In CI (GitHub Actions with `id-token: write` permission), this requires **no setup at all** — the same ambient OIDC credential that already powers this repo's `npm publish --provenance` is reused automatically. Run locally, it opens a browser for an interactive OIDC login, the same flow `cosign sign` uses.
+- `skill mint --transparency` prints it the moment the entry is created.
+- `skill verify-trust` prints it every time it re-verifies an anchor (this is the more common moment — verification happens far more often than minting).
+- The website's upload-and-verify flow (`/verify`) shows it next to its own trust verdict, and says plainly when a package has no anchor at all, so absence of a link reads as "not anchored," not as a broken feature.
+
+Follow the link and you're looking at the raw log entry on sigstore's own infrastructure, not anything this project runs or could quietly alter.
+
+## Optional keyless (Fulcio) signing — planned, not yet implemented
+
+The plan: `--keyless` would swap the signer — instead of your own `configured_ed25519` key, an ephemeral keypair generated locally and Fulcio issuing a short-lived certificate binding it to your OIDC identity (GitHub, Google, etc.) for the few seconds it takes to sign and log. The resulting `owner_identity` would then be a real, independently-checkable OIDC identity rather than an opaque key someone told you to trust — see [WHAT-IS-VERIFIABLE.md](./WHAT-IS-VERIFIABLE.md)'s "key-bound, but requires you to already trust the key" section for why this would be a meaningfully stronger claim than a bare pinned key.
+
+The CI path (GitHub Actions with `id-token: write` permission, reusing the same ambient OIDC credential that already powers this repo's own `npm publish --provenance`) is the first target, since it needs no interactive setup; a local interactive-browser-login path (the same flow `cosign sign` uses) is a fast-follow. Neither exists yet — there is no `--keyless` flag today. Tracked in [ROADMAP.md](./ROADMAP.md).
 
 ## What this is not
 
