@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: protocol **1.0.0 (Stable)**; reference packages **1.0.2**.
+Status: protocol **1.0.0 (Stable)**; reference packages **1.0.3**.
 
 ## Now (done in this repo)
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.3 — 2026-07-15
+
+Key Ceremony, Naming, Threat Model, and all six RFCs moved from `docs/` to
+the [wiki](https://github.com/dot-skill/skillerr/wiki), so `docs/` stays
+focused on task-oriented guides. This release updates the three shipped
+`skill mint`/`skill keygen` `--help` strings that pointed at
+`docs/KEY-CEREMONY.md`, a path that no longer exists as of this move, to
+point at the wiki instead.
+
 ## 1.0.2 — 2026-07-15
 
 Fixes leftover `"0.5"` strings that 1.0.1's protocol-version bump missed —
