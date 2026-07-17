@@ -32,8 +32,13 @@ test("loadOrCreateDefaultIssuer: first call generates + persists (0600) + pins; 
   assert.equal(issuer.created, true);
   assert.equal(issuer.pinned, true);
   assert.ok(existsSync(keyPath), "private key file written");
-  // Private key is secret-scoped.
-  assert.equal(statSync(keyPath).mode & 0o777, 0o600);
+  // Private key is secret-scoped. Windows has no POSIX mode bits, fs mode
+  // requests are a no-op there (this is a filesystem/platform limitation,
+  // not something the write call can control), so only assert it on
+  // platforms where chmod actually applies.
+  if (process.platform !== "win32") {
+    assert.equal(statSync(keyPath).mode & 0o777, 0o600);
+  }
   // Public key was pinned in the trust store under the derived key id.
   const store = loadTrustStore(trustStorePath);
   assert.equal(store.keys.length, 1);
