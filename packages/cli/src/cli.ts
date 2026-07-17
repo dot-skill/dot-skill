@@ -161,6 +161,19 @@ Create:
                                        --mint). Never fabricates human review.
                                        With no workspace and no --into, it's a
                                        read-only preview (nothing written).
+  skill publish [file.skill] [--host name] [--rekor-url <url>] [--keyless]
+                                       Seal a release AND publish a public,
+                                       independently-checkable provenance record
+                                       (a Sigstore Rekor transparency-log entry),
+                                       then print the search.sigstore.dev URL.
+                                       Zero setup: a per-user signing key is
+                                       auto-generated on first use (the public
+                                       log needs a key but NO login). This is a
+                                       public provenance anchor, NOT a
+                                       marketplace. Rekor entries are PERMANENT
+                                       and WORLD-READABLE, never publish a secret
+                                       skill. --no-transparency seals without
+                                       anchoring. See docs/TRANSPARENCY.md
   skill mint [file.skill] [--host name] [--signer-key <pem>] [--key-id id]
              [--transparency] [--rekor-url <url>] [--keyless] [--fulcio-url <url>]
                                        Seal release (host required). No file arg
@@ -169,28 +182,31 @@ Create:
                                        inspect/validate. Default seal is public-dev
                                        HMAC (development trust only). Pass
                                        --signer-key for a configured Ed25519 issuer
-                                       seal (verified_issuer-eligible) — see
-                                       skill keygen and docs/KEY-CEREMONY.md
-                                       --transparency additionally logs the sealed
-                                       digest to a public Rekor transparency log
-                                       (requires --signer-key; default log is the
-                                       public rekor.sigstore.dev — PERMANENT and
-                                       WORLD-READABLE once logged, never anchor a
-                                       secret skill). Prints a search.sigstore.dev
-                                       link so anyone can check the entry
-                                       independently, not just trust this tool's
-                                       word. See docs/TRANSPARENCY.md
+                                       seal (verified_issuer-eligible), see
+                                       skill keygen and docs/KEY-CEREMONY.md.
+                                       --transparency logs the sealed digest to a
+                                       public Rekor transparency log and prints a
+                                       search.sigstore.dev link (independently
+                                       checkable, not just this tool's word). It
+                                       needs a signing key but NO login: if none
+                                       is configured, a per-user key is
+                                       auto-generated on first use (same as
+                                       skill publish). Default log is the public
+                                       rekor.sigstore.dev, PERMANENT and
+                                       WORLD-READABLE once logged.
                                        --keyless adds a second, independent
                                        anchor via Fulcio + Rekor, bound to your
-                                       OIDC identity instead of --signer-key —
-                                       no interactive setup needed in CI (GitHub
-                                       Actions' ambient id-token: write, same
-                                       mechanism npm trusted publishing uses);
-                                       fails closed outside such an environment.
-                                       No local/interactive login yet. Combines
-                                       with any signer choice, or none.
-  skill keygen [-o dir] [--key-id id]  Generate an Ed25519 issuer keypair for
-                                       production signing (docs/KEY-CEREMONY.md)
+                                       OIDC identity instead of a local key. This
+                                       one DOES need an ambient OIDC token (CI,
+                                       e.g. GitHub Actions id-token: write); it
+                                       fails closed with no local login yet.
+  skill keygen [-o dir] [--key-id id]  With no -o: provision your default
+                                       per-user issuer key (~/.skillerr/
+                                       issuer-key.pem) and pin its public key in
+                                       your own trust store, so skill publish /
+                                       mint --transparency sign with it. With
+                                       -o <dir>: write a named production keypair
+                                       you manage yourself (docs/KEY-CEREMONY.md).
 
 Multi-skill identify:
   skill agent-guide [--json]           Exact create/identify protocol steps

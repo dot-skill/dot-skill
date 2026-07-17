@@ -2668,3 +2668,197 @@ test("PHASE 4: a tool step backed by a bundled exec-class script refuses without
   assert.equal(toolStep?.status, "succeeded");
   assert.equal(runAllowed.steps.find((s) => s.step_id === "emit")?.status, "succeeded");
 });
+
+// ---------------------------------------------------------------------------
+// Frictionless flow: ingest -> load-materialize -> release, and zero-setup
+// public provenance URL. HOME is redirected to a temp dir in every test that
+// provisions a key, so nothing touches the real ~/.skillerr. Anchoring tests
+// point --rekor-url at an unreachable host: the anchor fails gracefully and is
+// reported honestly, with no real (permanent, public) Rekor write.
+// ---------------------------------------------------------------------------
+
+test("PART C1: skill load --into materializes an editable workspace (staged sections + contract), read-only preview otherwise", async () => {
+  const { mkdtempSync, mkdirSync } = await import("node:fs");
+  const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+  const skillMd = fileURLToPath(new URL("../../../examples/ingest-skill-md", import.meta.url));
+  const dir = mkdtempSync(join(tmpdir(), "skill-load-mat-"));
+  const outSkill = join(dir, "out.skill");
+  const env = { ...process.env, SKILL_HOST: "cursor" };
+
+  execFileSync(process.execPath, [cliPath, "ingest", skillMd, "-o", outSkill, "--host", "cursor"], {
+    encoding: "utf8",
+    env,
+  });
+
+  const ws = join(dir, "ws");
+  const mat = JSON.parse(
+    execFileSync(process.execPath, [cliPath, "load", outSkill, "--into", ws, "--host", "cursor"], {
+      encoding: "utf8",
+      env,
+    }),
+  ) as { mode: string; sections_staged: number; contract_written: boolean; needs_human_review: boolean };
+  assert.equal(mat.mode, "materialized");
+  assert.ok(mat.sections_staged > 0, "knowledge staged as sections");
+  assert.equal(mat.contract_written, true);
+  assert.equal(mat.needs_human_review, true, "ingested contract still needs human review");
+
+  const status = JSON.parse(
+    execFileSync(process.execPath, [cliPath, "status"], { encoding: "utf8", cwd: ws, env }),
+  ) as { staged: unknown[] };
+  assert.equal(status.staged.length, mat.sections_staged, "status sees the materialized staged sections");
+
+  // No workspace, no --into => read-only preview, nothing written.
+  const empty = join(dir, "empty");
+  mkdirSync(empty, { recursive: true });
+  const preview = JSON.parse(
+    execFileSync(process.execPath, [cliPath, "load", outSkill, "--host", "cursor"], {
+      encoding: "utf8",
+      cwd: empty,
+      env,
+    }),
+  ) as { mode: string };
+  assert.equal(preview.mode, "read_only_preview");
+});
+
+test("PART C2: a load-materialized draft reaches a signed release after human_review is recorded", async () => {
+  const { mkdtempSync, readFileSync: rf, writeFileSync } = await import("node:fs");
+  const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+  const skillMd = fileURLToPath(new URL("../../../examples/ingest-skill-md", import.meta.url));
+  const dir = mkdtempSync(join(tmpdir(), "skill-load-release-"));
+  const outSkill = join(dir, "out.skill");
+  const ws = join(dir, "ws");
+  const env = { ...process.env, SKILL_HOST: "cursor" };
+
+  execFileSync(process.execPath, [cliPath, "ingest", skillMd, "-o", outSkill, "--host", "cursor"], { encoding: "utf8", env });
+  execFileSync(process.execPath, [cliPath, "load", outSkill, "--into", ws, "--host", "cursor"], { encoding: "utf8", env });
+
+  // Release compile refuses before review is recorded (exits non-zero, so
+  // the JSON comes back on the thrown error's stdout).
+  let refusedStdout = "";
+  try {
+    execFileSync(process.execPath, [cliPath, "compile", "-m", "x", "--approve", "--profile", "release"], {
+      encoding: "utf8",
+      cwd: ws,
+      env,
+    });
+    assert.fail("release compile should have refused before human review");
+  } catch (e) {
+    refusedStdout = String((e as { stdout?: string }).stdout ?? "");
+  }
+  const refused = JSON.parse(refusedStdout) as { ok: boolean; kind?: string };
+  assert.equal(refused.ok, false);
+  assert.equal(refused.kind, "compile_refused");
+
+  // A human records review by editing the materialized contract.
+  const contractPath = join(ws, ".skill", "contract.json");
+  const contract = JSON.parse(rf(contractPath, "utf8")) as { provenance: { human_review: unknown } };
+  contract.provenance.human_review = {
+    status: "reviewed",
+    actor: "conformance-human",
+    at: new Date().toISOString(),
+    scope: ["contract", "knowledge"],
+  };
+  writeFileSync(contractPath, JSON.stringify(contract, null, 2));
+
+  const released = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [cliPath, "compile", "-m", "reviewed", "--approve", "--mint", "--profile", "release"],
+      { encoding: "utf8", cwd: ws, env },
+    ),
+  ) as { ok: boolean; profile: string; minted: boolean };
+  assert.equal(released.ok, true);
+  assert.equal(released.profile, "release");
+  assert.equal(released.minted, true);
+});
+
+test("PART C3: skill keygen (default) provisions a per-user issuer key and pins its public key", async () => {
+  const { mkdtempSync, existsSync } = await import("node:fs");
+  const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+  const home = mkdtempSync(join(tmpdir(), "skill-home-keygen-"));
+  const env = { ...process.env, HOME: home, USERPROFILE: home, SKILL_HOST: "cursor" };
+
+  const gen = JSON.parse(
+    execFileSync(process.execPath, [cliPath, "keygen"], { encoding: "utf8", env }),
+  ) as { ok: boolean; key_id: string; created: boolean; is_default_issuer: boolean };
+  assert.equal(gen.ok, true);
+  assert.equal(gen.created, true);
+  assert.equal(gen.is_default_issuer, true);
+  assert.match(gen.key_id, /^skillerr-issuer-/);
+  assert.ok(existsSync(join(home, ".skillerr", "issuer-key.pem")));
+  const store = JSON.parse(readFileSync(join(home, ".skillerr", "trust-store.json"), "utf8")) as {
+    keys: Array<{ key_id: string }>;
+  };
+  assert.ok(store.keys.some((k) => k.key_id === gen.key_id), "public key pinned in own trust store");
+});
+
+test("PART C4: skill mint --transparency auto-provisions a key with no --signer-key and no login; anchor failure is graceful, never a throw", async () => {
+  const { mkdtempSync } = await import("node:fs");
+  const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+  const sourcePath = fileURLToPath(new URL("../../../examples/contract-foundation/source.json", import.meta.url));
+  const dir = mkdtempSync(join(tmpdir(), "skill-mint-transparency-"));
+  const home = mkdtempSync(join(tmpdir(), "skill-home-mint-"));
+  const packageFile = join(dir, "out.skill");
+  const env = { ...process.env, HOME: home, USERPROFILE: home, SKILL_HOST: "cursor" };
+  // No agent-runtime evidence, so this exercises the self_reported (not
+  // verified_issuer) binding path that used to throw.
+  delete (env as Record<string, string | undefined>).SKILL_SESSION_ID;
+  delete (env as Record<string, string | undefined>).CLAUDE_CODE_ENTRYPOINT;
+
+  execFileSync(
+    process.execPath,
+    [cliPath, "pack", sourcePath, "-o", packageFile, "--profile", "release", "--host", "cursor"],
+    { encoding: "utf8", env },
+  );
+
+  const minted = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [cliPath, "mint", packageFile, "--transparency", "--rekor-url", "http://127.0.0.1:9", "--host", "cursor"],
+      { encoding: "utf8", env },
+    ),
+  ) as {
+    ok: boolean;
+    mint_status: string;
+    issuer_key?: { created: boolean; pinned: boolean };
+    transparency?: { ok: boolean; error?: string };
+  };
+  assert.equal(minted.ok, true, "mint succeeds without a configured key and without throwing");
+  assert.equal(minted.mint_status, "minted");
+  assert.equal(minted.issuer_key?.created, true, "a per-user key was auto-generated");
+  assert.equal(minted.transparency?.ok, false, "anchor to an unreachable log fails");
+  assert.doesNotMatch(
+    minted.transparency?.error ?? "",
+    /requires --signer-key/,
+    "the old 'requires --signer-key' error must be gone",
+  );
+});
+
+test("PART C5: skill publish seals + reports honestly; auto-provisions a key; no throw on anchor failure", async () => {
+  const { mkdtempSync } = await import("node:fs");
+  const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+  const sourcePath = fileURLToPath(new URL("../../../examples/contract-foundation/source.json", import.meta.url));
+  const dir = mkdtempSync(join(tmpdir(), "skill-publish-"));
+  const home = mkdtempSync(join(tmpdir(), "skill-home-publish-"));
+  const packageFile = join(dir, "out.skill");
+  const env = { ...process.env, HOME: home, USERPROFILE: home, SKILL_HOST: "cursor" };
+
+  execFileSync(
+    process.execPath,
+    [cliPath, "pack", sourcePath, "-o", packageFile, "--profile", "release", "--host", "cursor"],
+    { encoding: "utf8", env },
+  );
+
+  const published = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [cliPath, "publish", packageFile, "--rekor-url", "http://127.0.0.1:9", "--host", "cursor"],
+      { encoding: "utf8", env },
+    ),
+  ) as { ok: boolean; mint_status: string; public_url?: string; message: string; issuer_key?: { created: boolean } };
+  assert.equal(published.ok, true);
+  assert.equal(published.mint_status, "minted");
+  assert.equal(published.issuer_key?.created, true);
+  assert.ok(!published.public_url, "no URL when the anchor could not complete");
+  assert.match(published.message, /public anchor did not complete/);
+});
