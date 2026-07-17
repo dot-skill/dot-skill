@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.3.0 (2026-07-17)
+
+**Frictionless lifecycle: ingest to signed release to a public provenance URL.**
+Closes the two flow gaps a fresh-context agent hit walking the protocol end to
+end.
+
+- **Ingest to release bridge.** `skill load <file.skill> --into <dir>` (or plain
+  `skill load` inside a workspace) now materializes a package into an editable
+  workspace, staging its knowledge as sections and writing `.skill/contract.json`,
+  so an ingested continuity package can actually be taken forward to a release.
+  It never fabricates `provenance.human_review` (a human still records that in
+  the contract). With no workspace and no `--into`, `skill load` stays a
+  read-only handoff preview, now labeled honestly via a `mode` field.
+- **Zero-setup public provenance URL.** New `skill publish <file.skill>` seals a
+  release and anchors its digest to the public Sigstore Rekor transparency log,
+  printing an independently-verifiable `search.sigstore.dev` URL. The public log
+  needs a signing key but no login, so a per-user Ed25519 issuer key is
+  auto-provisioned on first use (`~/.skillerr/issuer-key.pem`, pinned in your own
+  trust store) and reused after. `skill mint --transparency` gets the same
+  auto-key, removing the old "requires --signer-key" dead end.
+- **Honest trust, not a shortcut.** The transparency anchor is decoupled from the
+  `verified_issuer` evidence gate: a signer without real agent-runtime evidence
+  now binds `self_reported` instead of throwing, so the public anchor works while
+  the seal stays honest. Auto-provisioning a key never fabricates evidence or
+  inflates trust_state.
+- `skill keygen` (no `-o`) provisions/pins the default per-user issuer key; `-o
+  <dir>` keeps the named production key-ceremony path. Only `--keyless` (Fulcio
+  OIDC) still requires an identity provider, and only in CI.
+- Fixed subcommand `--help` (was opening `--help` as a file / hitting
+  requireWorkspace).
+
+Docs across the repo and site were swept for consistency with the corrected
+flow. 198 tests (was 189).
+
 ## 1.2.0 (2026-07-16)
 
 **Agent Skills ecosystem compatibility (RFC 0008).** `skill ingest` now maps the

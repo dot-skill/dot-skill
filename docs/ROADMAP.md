@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: protocol **1.0.0 (Stable)**; reference packages **1.2.0**. The package number should always match [`packages/skillerr/package.json`](../packages/skillerr/package.json); if this line ever drifts from that file, the file wins. Maturity levels (Stable / Candidate / Preview) are defined in [GOVERNANCE.md](../GOVERNANCE.md). Everything below is Stable except `@skillerr/skill-score` (`skill score`), which is **Preview**, it's real and shipped, but its scoring interface may still change without a major bump.
+Status: protocol **1.0.0 (Stable)**; reference packages **1.3.0**. The package number should always match [`packages/skillerr/package.json`](../packages/skillerr/package.json); if this line ever drifts from that file, the file wins. Maturity levels (Stable / Candidate / Preview) are defined in [GOVERNANCE.md](../GOVERNANCE.md). Everything below is Stable except `@skillerr/skill-score` (`skill score`), which is **Preview**, it's real and shipped, but its scoring interface may still change without a major bump.
 
 ## Now (done in this repo)
 
@@ -117,6 +117,15 @@ Status: protocol **1.0.0 (Stable)**; reference packages **1.2.0**. The package n
       `provenance.human_review` (a human still records that in the contract).
       With no workspace and no `--into`, `skill load` stays a read-only
       preview. See [docs/FROM-SKILL-CREATOR.md](./FROM-SKILL-CREATOR.md).
+- [x] Zero-setup public provenance URL: `skill publish <file.skill>` seals a
+      release and anchors it to the public Rekor log, printing an
+      independently-verifiable `search.sigstore.dev` link. The public log needs
+      a signing key but no login, so a per-user Ed25519 issuer key is
+      auto-provisioned on first use (and `skill mint --transparency` gets the
+      same auto-key, removing the old "requires --signer-key" dead end). The
+      anchor is decoupled from the verified_issuer evidence gate, so it works
+      without ever fabricating evidence or inflating trust_state. See
+      [docs/MINT.md](./MINT.md) and [docs/TRANSPARENCY.md](./TRANSPARENCY.md).
 
 ## Next (great contribution targets)
 
