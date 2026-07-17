@@ -20,7 +20,7 @@ npm i -g skillerr
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![Protocol](https://img.shields.io/badge/protocol-1.0.0-blue.svg)](./docs/PROTOCOL.md)
-[![Tests](https://img.shields.io/badge/tests-189%20passing-brightgreen.svg)](./docs/SECURITY.md)
+[![Tests](https://img.shields.io/badge/tests-198%20passing-brightgreen.svg)](./docs/SECURITY.md)
 
 **Contributing:** see [CONTRIBUTING.md](./CONTRIBUTING.md) for the DCO/PR checklist, or jump straight to a scoped task in [docs/GOOD-FIRST-ISSUES.md](./docs/GOOD-FIRST-ISSUES.md).
 
@@ -195,12 +195,13 @@ Commands below are what the **agent** runs — not a human homework list.
 |------|---------------------|
 | Create workspace | `skill init` → `journey` → `propose` → `status` |
 | Convert an existing SKILL.md | `skill ingest <path>` |
+| Take an ingested skill to a workspace | `skill load <file.skill> --into <dir>` (stages sections + writes the contract) |
 | Mid-work handoff | `skill checkpoint` |
 | Release when complete | `skill compile -m "…" --approve --mint` |
+| Public provenance URL, zero setup | `skill publish <file.skill>` (auto-keys, anchors to Rekor, prints the `search.sigstore.dev` link) |
 | Production issuer identity | `skill keygen` → `skill mint --signer-key …` for `verified_issuer` trust |
-| Publicly anchor authorship | `skill mint --transparency` (Rekor) and/or `--keyless` (Fulcio OIDC) |
 | Trust before run | `skill inspect --trust --claims` → `validate` → `verify-trust --claims` → `run` (dry-run) |
-| Resume handoff | `skill load ./file.skill` |
+| Read-only handoff preview | `skill load ./file.skill` |
 
 Creation requires a declared agent host (`SKILL_HOST=cursor|ollama|claude|…`). Humans review and approve releases. Declared host/model fields are self-reported provenance, not cryptographic proof of authorship.
 
@@ -213,6 +214,7 @@ Creation requires a declared agent host (`SKILL_HOST=cursor|ollama|claude|…`).
 - **Dry-run** before execute
 - Continuity drafts may be incomplete; **release** compile refuses incomplete contracts (`compile_refused`)
 - **Real cryptographic identity in production:** `skill keygen` + `--signer-key` mints with a configured Ed25519 issuer key as `verified_issuer` — the bundled zero-setup key (used when no `--signer-key` is given) is for trying the CLI, not for shipping. See [Key Ceremony](./docs/KEY-CEREMONY.md)
+- **Public provenance, zero setup:** `skill publish <file.skill>` seals a release and anchors its digest to the public Sigstore Rekor log, printing an independently-verifiable `search.sigstore.dev` link. The public log needs a signing key but **no login**, so a per-user key is auto-generated on first run. Rekor entries are permanent and world-readable. See [Transparency](./docs/TRANSPARENCY.md)
 
 See [docs/SECURITY.md](./docs/SECURITY.md).
 
@@ -260,7 +262,7 @@ Full package layout spec: [docs/PROTOCOL.md](./docs/PROTOCOL.md#container).
 ## Status
 
 Specification: **1.0.0 (Stable)** ([docs/PROTOCOL.md](./docs/PROTOCOL.md)) — future changes go through the open [RFC process](./docs/rfcs/), not silent revisions.  
-Reference CLI: `skillerr` @ **1.2.0**, a stable public API backed by 189 tests passing on every push (mac/Linux/Windows × Node 22/24), including an [adversarial security corpus](https://github.com/dot-skill/skillerr/wiki/Threat-Model) and a live-tested [transparency-log integration](./docs/TRANSPARENCY.md).  
+Reference CLI: `skillerr` @ **1.3.0**, a stable public API backed by 198 tests passing on every push (mac/Linux/Windows × Node 22/24), including an [adversarial security corpus](https://github.com/dot-skill/skillerr/wiki/Threat-Model) and a live-tested [transparency-log integration](./docs/TRANSPARENCY.md).  
 Independent conforming implementations welcome.
 
 **Why the foundation is future-proof:**
