@@ -13,7 +13,7 @@ import { normalizePath, assertSafePaths, UnsafePathError } from "./paths.js";
 import { packSkill, unpackSkill } from "./pack.js";
 import { mintSkillPackage, verifyMintTrust } from "./mint.js";
 import { createEd25519Signer } from "./signer.js";
-import { validatePackageBytes, inspectSkill } from "./validate.js";
+import { validatePackageBytes, validateContractSchema, inspectSkill } from "./validate.js";
 import { compileSkillSource, approveCompilation } from "./compile.js";
 import {
   DEFAULT_SKILL_POLICY,
@@ -175,6 +175,28 @@ test("PROTO-7: schema-check catches a wrong field type the hand-written checks a
   assert.ok(
     validation.issues.some((i) => i.code === "schema_manifest" && i.message.includes("version")),
     JSON.stringify(validation.issues),
+  );
+});
+
+test("validateContractSchema: catches a bad enum on a raw, not-yet-compiled contract", () => {
+  // Regression: skill contract-check only ran assessSkillContract's
+  // hand-written completeness check, which validates required-key
+  // presence per item but never schema-checks types/enums. A contract
+  // with a garbage skill_kind used to report "complete" at contract-check
+  // time and only fail once packed and schema-validated at mint time,
+  // far too late for an authoring agent's fast feedback loop.
+  const badContract = {
+    kind: "skill_contract",
+    contract_version: "1.0",
+    skill_kind: "not_a_real_kind",
+    title: "x",
+    intent: "x",
+    sensitivity: "private",
+  };
+  const issues = validateContractSchema(badContract);
+  assert.ok(
+    issues.some((i) => i.code === "schema_contract" && i.message.includes("skill_kind")),
+    JSON.stringify(issues),
   );
 });
 

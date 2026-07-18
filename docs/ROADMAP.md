@@ -156,6 +156,11 @@ Status: protocol **1.0.0 (Stable)**; reference packages **1.5.0**. The package n
       same schema/workflow-integrity check `verify-trust` runs before
       signing, closing the gap that let an invalid package get minted,
       signed, and permanently published before anyone caught it.
+      `contract-check` itself never ran real JSON Schema validation either
+      (only the hand-rolled completeness check above), so a bad enum or
+      wrong type also passed silently until mint time; new
+      `validateContractSchema` closes that too, reported as a separate
+      `schema_issues` array in `contract-check`'s output.
 
 ## Next (great contribution targets)
 

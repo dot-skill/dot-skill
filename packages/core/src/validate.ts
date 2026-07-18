@@ -32,6 +32,7 @@ let schemaValidators:
       workflow: ValidateFunction;
       knowledgeItem: ValidateFunction;
       creationAttestation: ValidateFunction;
+      contract: ValidateFunction;
     }
   | undefined;
 
@@ -41,15 +42,34 @@ function getSchemaValidators(): NonNullable<typeof schemaValidators> {
     // Schemas declare format: "date-time" (provenance timestamps); without
     // this, ajv logs "unknown format ... ignored" noise on every validate.
     addFormats(ajv);
-    ajv.addSchema(loadSchema("skill-contract"));
+    const contractSchema = loadSchema("skill-contract");
+    ajv.addSchema(contractSchema);
     schemaValidators = {
       manifest: ajv.compile(loadSchema("skill-manifest")),
       workflow: ajv.compile(loadSchema("workflow")),
       knowledgeItem: ajv.compile(loadSchema("knowledge-item")),
       creationAttestation: ajv.compile(loadSchema("creation-attestation")),
+      // addSchema above registers it for the manifest schema's own $ref to
+      // resolve; compiling it standalone here lets a raw, not-yet-compiled
+      // contract (skill contract-check) be schema-checked too, not just a
+      // contract already embedded in a packed manifest.
+      contract: ajv.getSchema(contractSchema.$id as string) ?? ajv.compile(contractSchema),
     };
   }
   return schemaValidators;
+}
+
+/**
+ * Schema-only check for a raw, not-yet-compiled contract: enums (bad
+ * side_effect_class, sensitivity, etc.), types, and required top-level
+ * shape. `assessSkillContract`'s hand-rolled completeness check (required
+ * keys per item, cross-field rules) catches the rest, but never ran schema
+ * validation itself, so `skill contract-check` reported "complete" on
+ * schema-invalid contracts that only failed once packed and validated by
+ * `validatePackageBytes`, far too late in the authoring loop.
+ */
+export function validateContractSchema(contract: unknown): ValidationIssue[] {
+  return schemaIssues(getSchemaValidators().contract, contract, "schema_contract");
 }
 
 function schemaIssues(

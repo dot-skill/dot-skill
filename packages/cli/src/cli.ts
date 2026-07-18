@@ -61,6 +61,7 @@ import {
   mintKeylessAnchor,
   verifyKeylessAnchor,
   assessClaims,
+  validateContractSchema,
 } from "@skillerr/core";
 import type { AnchorVerification, KeylessVerification, AnchorSubject } from "@skillerr/core";
 import type { GradeOverride } from "@skillerr/core";
@@ -680,17 +681,27 @@ async function main() {
           ? (parsed as SkillSource).contract
           : parsed;
       const assessment = assessSkillContract(contract, profile);
+      // assessSkillContract's hand-rolled checks (required keys per item,
+      // cross-field rules) never ran actual JSON Schema validation, so this
+      // command reported "complete" on schema-invalid contracts (bad enums,
+      // wrong types) that only failed once packed and validated by
+      // validatePackageBytes at mint time, far too late for an authoring
+      // agent's fast feedback loop. Reported separately, not merged into
+      // assessment.issues: ContractIssue's code/field are closed unions
+      // that don't fit ajv's arbitrary schema paths.
+      const schema_issues = validateContractSchema(contract);
       console.log(
         JSON.stringify(
           {
             assessment,
+            schema_issues,
             explanation: explainContractAssessment(assessment),
           },
           null,
           2,
         ),
       );
-      process.exit(assessment.complete ? 0 : 2);
+      process.exit(assessment.complete && schema_issues.length === 0 ? 0 : 2);
       break;
     }
     case "init": {

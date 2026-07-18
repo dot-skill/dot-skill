@@ -30,6 +30,11 @@
   the compiler downstream (`undefined.localeCompare` sorting by a `.name`
   that didn't exist). Now flags the type mismatch directly, at the earliest
   possible point.
+- `skill contract-check` never ran real JSON Schema validation on the
+  contract at all, only the hand-rolled completeness check above, so a bad
+  enum (e.g. a garbage `skill_kind`) or wrong type also passed silently
+  until mint time. New `validateContractSchema` (`@skillerr/core`), wired
+  into `contract-check`'s output as a separate `schema_issues` array.
 - `skill compile --mint` now runs the same schema/workflow-integrity check
   `verify-trust` runs before signing. Previously it only checked the
   contract-level completeness report, which never inspected the compiled
