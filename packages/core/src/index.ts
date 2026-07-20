@@ -128,3 +128,19 @@ export type {
   Capability,
   GateResult,
 } from "./trust-spine.js";
+export {
+  buildLeaf,
+  treeHash,
+  buildSignedTreeHead,
+  generateInclusionProof,
+  verifyInclusion,
+  generateConsistencyProof,
+  verifyConsistency,
+} from "./merkle-log.js";
+export type {
+  LogEvent,
+  Leaf,
+  InclusionProof,
+  SignedTreeHead,
+  ConsistencyProof,
+} from "./merkle-log.js";
