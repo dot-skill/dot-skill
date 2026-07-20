@@ -4,8 +4,8 @@ This is the only handshake between this repo and the private `skillerr-registry`
 
 Newest first.
 
-<!-- Example entry, once the first adapter ships:
-## @skillerr/core@1.6.0
+## Pending release — `protocol/trust-spine` branch
 
-- `seal()` / `openSealed()` now available — thin async/Buffer-returning wrappers around `packSkill`/`unpackSkill`/`finalizeManifest`. See spec/CONTRACT.md's status table.
--->
+Adapter layer now available in `packages/core/src/trust-spine.ts`, matching spec/CONTRACT.md's Section 3a shapes: `seal`, `openSealed`, `sign`/`verifySignature` (published-key path only, keyless not yet split out), `Anchor`/`RekorAnchor`, `capabilitiesFromPermission` (`CapabilitySchema`, `shell` scope honestly empty pending a protocol change), `evaluateReleaseProfile`. Not yet started: `buildLeaf`/`verifyInclusion`/`verifyConsistency`, the unified `verify(digest, evidence)` entry point, `generateSBOM`, `attest`, `evaluatePolicy`, `scoreSignals`, `runSandboxed`'s declared-vs-actual diff, and the generic `fromFormat`/`toFormat` bridge — see spec/CONTRACT.md's status table for what each maps onto today.
+
+This note will be updated with the actual `@skillerr/core` version number once this branch goes through the normal release process (merge to `develop`, cut a `release/*` branch, lockstep version bump across all 7 packages, publish). Pin against a specific commit on `protocol/trust-spine` if you need to integrate before that lands.

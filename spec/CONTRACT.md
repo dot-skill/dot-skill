@@ -69,20 +69,22 @@ Tracks what actually exists in `packages/core` today versus this frozen shape. U
 
 | Contract item | Status | Existing primitive it's built on / adapts |
 |---|---|---|
-| `seal` | adapter, in progress | `packSkill` + `finalizeManifest` + `sealedManifestDigest` (`pack.ts`, `hash.ts`) |
-| `openSealed` | adapter, in progress | `unpackSkill` (`pack.ts`) |
-| `sign` / `verifySignature` | adapter, in progress | `createEd25519Signer` (`signer.ts`), `mintKeylessAnchor` (`transparency.ts`) |
+| `seal` | shipped (`trust-spine.ts`) | `packSkill` + `unpackSkill` (`pack.ts`), round-tripped so the manifest can't drift from the zip |
+| `openSealed` | shipped (`trust-spine.ts`) | `unpackSkill` (`pack.ts`) |
+| `sign` / `verifySignature` | shipped, published-key path only | `createEd25519Signer` / `verifyEd25519Signature` (`signer.ts`). Keyless (Fulcio) signing not yet split out of `mintKeylessAnchor` (`transparency.ts`), which signs and anchors atomically — real follow-up work, not a thin wrap |
 | `buildLeaf` / `verifyInclusion` / `verifyConsistency` | not started | no Merkle-log concept exists yet; `packages/registry` is a flat append-only log, not a Merkle tree |
-| `Anchor` interface + `RekorAnchor` | adapter, in progress | `anchorToRekor` / `verifyRekorAnchor` (`transparency.ts`) — real `@sigstore/*` calls already, just not behind this interface yet |
+| `Anchor` interface + `RekorAnchor` | shipped (`trust-spine.ts`) | delegates to the real, already-network-tested `anchorToRekor` / `verifyRekorAnchor` (`transparency.ts`). Subject metadata (skill_id/version/issuer_class) captured at `RekorAnchor(config)` construction time, since the frozen `anchor(digest)` signature has no room for it per-call |
 | `verify(digest, evidence)` | not started | closest existing primitives: `assessClaims` (`claims.ts`), `verifyMintTrust` (`mint.ts`) — different shape, needs composing |
 | `generateSBOM` | not started | nothing exists (confirmed zero CycloneDX/SBOM references anywhere in the repo) |
 | `attest` | not started | `buildAnchorStatement` (`transparency.ts`) produces a real in-toto v1 statement but scoped to the anchor subject/predicate, not general SLSA provenance |
 | `evaluatePolicy` | not started | only a fixed declarative `SkillPolicy` struct (`protocol/src/types.ts`), no pluggable rule engine |
 | `scoreSignals` | not started | nothing exists; `@skillerr/skill-score` computes a final score from `provenance/benchmark.json`, not raw signals |
-| `CapabilitySchema` | adapter, in progress | `SideEffectClass` + `SkillPermission.paths/hosts` (`protocol/src/types.ts`) — no distinct `shell`, no `commands` scoping yet |
+| `CapabilitySchema` | shipped (`trust-spine.ts`), `shell` scope honestly empty | `capabilitiesFromPermission()` normalizes `SideEffectClass` + `SkillPermission.paths/hosts`. No `commands` field exists to scope `shell` by yet — that needs a `@skillerr/protocol` schema change |
 | `runSandboxed` with declared-vs-actual diff | not started | `assertCapabilityAllowed` (`runtime/src/index.ts`) gates only, never diffs after the fact |
 | `fromFormat` / `toFormat` bridge | not started | `ingestSkillMd` / `exportAgentSkillFolder` hardcoded to one format pair (SKILL.md <-> Agent Skills folder), no `vercel`/`skills.sh` formats, no `LossReport` type |
-| `evaluateReleaseProfile` | adapter, in progress | `assessCompleteness` (`compile.ts`) is already pure pass/fail+reasons, but only covers completeness — full release gate logic is inline in `mintSkillPackage` |
+| `evaluateReleaseProfile` | shipped (`trust-spine.ts`) | pure pass/fail+reasons mirror of `mintSkillPackage`'s inline throw-based gate (`mint.ts`). Deliberately duplicated, not delegated — refactoring `mintSkillPackage` to call this instead of throwing inline is separate follow-up work |
+
+Follow-up work called out above, not yet scheduled: splitting a pure keyless `sign()` out of `mintKeylessAnchor`; adding `commands` scoping to `SkillPermission` for real `shell` capabilities; refactoring `mintSkillPackage` to call `evaluateReleaseProfile` instead of duplicating its checks inline.
 
 ## Licensing note
 
