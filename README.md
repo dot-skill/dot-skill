@@ -14,7 +14,7 @@ Create, inspect, sign, and run portable `.skill` packages for AI agents, the int
 npm i -g skillerr
 ```
 
-**Site:** [skillerr.com](https://www.skillerr.com/docs/) · **Format:** `.skill` (sealed ZIP) · **Reference CLI:** [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill`) · **Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr)
+**Site:** [skillerr.com](https://docs.skillerr.com/) · **Format:** `.skill` (sealed ZIP) · **Reference CLI:** [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill`) · **Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr)
 
 [![npm](https://img.shields.io/npm/v/skillerr.svg)](https://www.npmjs.com/package/skillerr)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
@@ -288,7 +288,7 @@ Host authors typically integrate the protocol libraries; end users install **`sk
 - [What is verifiable](./docs/WHAT-IS-VERIFIABLE.md) · [Trust model](./docs/TRUST-MODEL.md) · [Cryptographic foundation](./docs/CRYPTO-FOUNDATION.md) · [Transparency](./docs/TRANSPARENCY.md) · [Security](./docs/SECURITY.md) · [Threat model](https://github.com/dot-skill/skillerr/wiki/Threat-Model) · [Key ceremony](./docs/KEY-CEREMONY.md) · [Canonicalization (RFC 8785)](./docs/CANONICALIZATION.md)
 - [Mint](./docs/MINT.md) · [Runtime](./docs/RUNTIME.md) · [Workspace](./docs/WORKSPACE.md) · [File type / OS registration](./docs/FILE-TYPE.md)
 - [RFCs](./docs/rfcs/) — protocol design proposals, spec-only and implemented
-- Site guides: [skillerr.com](https://www.skillerr.com/docs/)
+- Site guides: [skillerr.com](https://docs.skillerr.com/)
 
 **Agent Skills ecosystem:** [Agent Skills specification](https://agentskills.io/specification) (the authoring format) · [vercel-labs/skills](https://github.com/vercel-labs/skills) (`npx skills add`, distribution) · [skills.sh](https://skills.sh) (directory) · [Claude Code skills docs](https://code.claude.com/docs/en/skills)
 

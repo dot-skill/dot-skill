@@ -66,7 +66,7 @@ Status: protocol **1.0.0 (Stable)**; reference packages **1.5.2**. The package n
       closed outside such an environment). Interactive browser login for
       local use is not yet implemented. See
       [docs/TRANSPARENCY.md](./TRANSPARENCY.md)
-- [x] Public verify utility on `www.skillerr.com` — upload a `.skill`
+- [x] Public verify utility on `docs.skillerr.com` — upload a `.skill`
       file, get back the same TrustView `skill inspect --trust` would
       report, plus the transparency-log link above when applicable. Not
       the digest-lookup `GET /skill/{package_digest}` API originally

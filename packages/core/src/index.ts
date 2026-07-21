@@ -159,7 +159,9 @@ export type {
   SignedTreeHead,
   ConsistencyProof,
 } from "./merkle-log.js";
-export { isContinuity, openContinuity, resumePreview } from "./continuity.js";
+export { isContinuity, openContinuity, resumePreview, renderResumeContract } from "./continuity.js";
+export { captureSession } from "./capture.js";
+export type { CaptureOptions, CaptureContext, CaptureResult } from "./capture.js";
 export type {
   Gap,
   ContinuitySection,
@@ -168,4 +170,11 @@ export type {
   ContinuityOpenResult,
   ResumeTarget,
   ResumeContract,
+  WorkingSet,
+  WorkingSetFile,
+  WorkingSetCommit,
+  PlanItem,
+  FilePointer,
+  ToolResult,
+  ContinuitySource,
 } from "./continuity.js";

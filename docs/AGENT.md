@@ -122,6 +122,34 @@ skill run ./file.skill                     # dry-run by default
 skill run ./file.skill --mode execute --allow-untrusted   # explicit unsafe
 ```
 
+## Capture a session for resume (what you run)
+
+To hand your current session to another agent, seal a continuity `.skill` with `skill capture`. Environment (git) capture always runs — branch, base/HEAD, redacted diff, changed files, recent commits, untracked — so a dirty repo is never empty even with zero extra input:
+
+```bash
+skill capture -o handoff.skill -m "what this session is about"
+```
+
+Enrich it with what only you know by supplying a `CaptureContext` JSON via `--context <file.json>`, `--context -` (stdin), or an auto-loaded `.skillerr/context.json`. Every field is optional; supply what you have. Core merges it **over** the git capture and scrubs secrets from every string:
+
+```jsonc
+{
+  "intent": "one-line goal of the session",
+  "agent": { "host": "cursor", "provider": "anthropic", "model": "claude-sonnet-5" },
+  "plan": [{ "status": "done", "text": "…" }, { "status": "in_progress", "text": "…" }],
+  "nextSteps": ["the very next action", "then this"],
+  "decisions": ["chose X over Y because …"],
+  "rejectedPaths": ["tried Z, abandoned it because …"],
+  "openThreads": ["unresolved question for the next agent"],
+  "knowledge": [{ "title": "constraint discovered", "body": "…" }],
+  "filePointers": [{ "path": "src/foo.ts", "note": "the core change" }],
+  "toolResults": [{ "tool": "test", "summary": "3 passing, 1 flaky" }],
+  "journey": { "summary": "optional; overrides the git-derived summary" }
+}
+```
+
+Never fabricate these — omit what you don't know. The other side runs `skill resume ./handoff.skill` to get a paste-ready briefing. Use `skill capture` for a git-aware session handoff; use `skill checkpoint` inside a `.skill` workspace for a staged-section continuity draft.
+
 ## On `compile_refused`
 
 Tell the human what is missing (`intent`, `journey`, `sections`, contract fields, …). Complete those parts, then compile again. Do not pack a fake release skill.

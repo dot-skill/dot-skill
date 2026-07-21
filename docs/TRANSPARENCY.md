@@ -61,7 +61,7 @@ Default is the public instance (`rekor.sigstore.dev`) — free, world-readable, 
 
 ## Independent verification: a link to Rekor's own UI, not just our word
 
-Neither the CLI nor `www.skillerr.com`'s verify page ask you to trust their own "verified" output on faith. When a `transparency_log` anchor is present and verifies against the pinned issuer key — and it's logged to the public `rekor.sigstore.dev` instance (a self-hosted log has no public search UI, so no link is fabricated for it) — both surfaces hand back a `https://search.sigstore.dev/?logIndex=<n>` link:
+Neither the CLI nor `docs.skillerr.com`'s verify page ask you to trust their own "verified" output on faith. When a `transparency_log` anchor is present and verifies against the pinned issuer key — and it's logged to the public `rekor.sigstore.dev` instance (a self-hosted log has no public search UI, so no link is fabricated for it) — both surfaces hand back a `https://search.sigstore.dev/?logIndex=<n>` link:
 
 - `skill mint --transparency` prints it the moment the entry is created.
 - `skill verify-trust` prints it every time it re-verifies an anchor (this is the more common moment — verification happens far more often than minting).
