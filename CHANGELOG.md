@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.6.0 (2026-07-21)
+
+**Trust spine, continuity/capture, scrubbing, Merkle log, verify/SBOM, Apache-2.0 relicense.** Everything that had accumulated on `develop` since 1.5.2 — the load-bearing pieces the private registry was mocking — now ships on npm.
+
+- **Session capture + Resume Contract 1.0** (`packages/core/src/capture.ts` + `continuity.ts`, [RFC 0009](./docs/rfcs/0009-resume-contract.md)): `captureSession` always runs git working-set capture (branch, base/HEAD, staged+unstaged diff, changed files with `+adds -dels`, recent commits, untracked) so a dirty repo is never empty; merges optional agent `CaptureContext` (object / JSON / stdin / `.skillerr/context.json`). `openContinuity` / `resumePreview` / `renderResumeContract` emit a substantive briefing with no preview/pending framing. CLI: `skill capture` / `skill resume`. Redaction preserves substance (secrets scrubbed; diff/files/journey kept).
+- **Adapter / trust spine** (`trust-spine.ts`): `seal`, `openSealed`, `sign`/`verifySignature`, `Anchor`/`RekorAnchor`, `capabilitiesFromPermission`, `evaluateReleaseProfile`, plus **`verify(digest, evidence)`** (unified entry point) and **`generateSBOM`** (minimal CycloneDX 1.5 from `SkillManifest.dependencies`).
+- **Merkle-log spine** (`merkle-log.ts`): RFC 6962-style `buildLeaf` / `verifyInclusion` / `verifyConsistency` plus constructive counterparts (`treeHash`, proof generators, `buildSignedTreeHead`) — pure/standalone, no registry knowledge.
+- **Deterministic scrubbing** (`scrub.ts`): wired into compile/checkpoint/pack; see [docs/SCRUBBING.md](./docs/SCRUBBING.md).
+- **Relicensed to Apache-2.0** (was MIT) across LICENSE files, package.json, and docs. Prior published MIT versions remain MIT under those version numbers.
+- **Doc hygiene**: `docs/DOC-MAP.md`; CI checks for license consistency and dead relative markdown links; Docs impact section in CONTRIBUTING; stale `skillerr.com/docs` → `docs.skillerr.com` URL fix.
+- Test count badge updated to **285** (was stale at 200).
+
+See [INTEGRATION_NOTES.md](./INTEGRATION_NOTES.md) for the registry drop-the-mocks action and `CaptureContext` intake schema.
+
 ## 1.5.2 (2026-07-18)
 
 Process change, no functional code change: adopted a git-flow branching model. `main` now only accepts merges from `release/*`/`hotfix/*` branches (enforced by a required `enforce-branch-flow` CI check plus branch protection); day-to-day work now goes through `develop`. See `CONTRIBUTING.md`'s new "Branch flow" section.

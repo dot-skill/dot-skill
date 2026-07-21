@@ -1,8 +1,8 @@
 {
   "name": "@skillerr/registry",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "Optional local transparency log for .skill package digests",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": {
     "name": "Bharat Dudeja",
     "url": "https://github.com/bharatdudeja13-cmd"
@@ -50,8 +50,8 @@
     "test": "node --test dist/registry.test.js"
   },
   "dependencies": {
-    "@skillerr/core": "^1.5.2",
-    "@skillerr/protocol": "^1.5.2"
+    "@skillerr/core": "^1.6.0",
+    "@skillerr/protocol": "^1.6.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

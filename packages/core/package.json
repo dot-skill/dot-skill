@@ -1,8 +1,8 @@
 {
   "name": "@skillerr/core",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "Compile, pack, validate, and mint portable .skill packages",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": {
     "name": "Bharat Dudeja",
     "url": "https://github.com/bharatdudeja13-cmd"
@@ -35,6 +35,7 @@
     "dist",
     "!dist/**/*.test.js",
     "!dist/**/*.test.d.ts",
+    "scrub-rules.json",
     "README.md",
     "LICENSE"
   ],
@@ -48,7 +49,7 @@
     "build": "rimraf dist && tsc",
     "prepack": "npm run build",
     "clean": "rimraf dist",
-    "test": "node --test dist/core.test.js dist/ingest.test.js dist/eval.test.js dist/transparency.test.js dist/claims.test.js dist/default-issuer.test.js"
+    "test": "node --test dist/core.test.js dist/ingest.test.js dist/eval.test.js dist/transparency.test.js dist/claims.test.js dist/default-issuer.test.js dist/scrub.test.js dist/trust-spine.test.js dist/merkle-log.test.js dist/continuity.test.js dist/capture.test.js"
   },
   "dependencies": {
     "@sigstore/bundle": "^5.0.0",
@@ -56,7 +57,7 @@
     "@sigstore/sign": "^5.0.0",
     "@sigstore/tuf": "^4.0.2",
     "@sigstore/verify": "^4.1.0",
-    "@skillerr/protocol": "^1.5.2",
+    "@skillerr/protocol": "^1.6.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "fflate": "^0.8.2"

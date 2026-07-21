@@ -16,13 +16,13 @@ Create, inspect, sign, and run portable `.skill` packages for AI agents, the int
 npm i -g skillerr
 ```
 
-**Site:** [skillerr.com](https://www.skillerr.com/docs/) · **Format:** `.skill` (sealed ZIP) · **Reference CLI:** [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill`) · **Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr)
+**Site:** [skillerr.com](https://docs.skillerr.com/) · **Format:** `.skill` (sealed ZIP) · **Reference CLI:** [`skillerr`](https://www.npmjs.com/package/skillerr) (`skill`) · **Repo:** [dot-skill/skillerr](https://github.com/dot-skill/skillerr)
 
 [![npm](https://img.shields.io/npm/v/skillerr.svg)](https://www.npmjs.com/package/skillerr)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/dot-skill/skillerr/blob/main/LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/dot-skill/skillerr/blob/main/LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![Protocol](https://img.shields.io/badge/protocol-1.0.0-blue.svg)](https://github.com/dot-skill/skillerr/blob/main/docs/PROTOCOL.md)
-[![Tests](https://img.shields.io/badge/tests-200%20passing-brightgreen.svg)](https://github.com/dot-skill/skillerr/blob/main/docs/SECURITY.md)
+[![Tests](https://img.shields.io/badge/tests-285%20passing-brightgreen.svg)](https://github.com/dot-skill/skillerr/blob/main/docs/SECURITY.md)
 
 **Contributing:** see [CONTRIBUTING.md](https://github.com/dot-skill/skillerr/blob/main/CONTRIBUTING.md) for the DCO/PR checklist, or jump straight to a scoped task in [docs/GOOD-FIRST-ISSUES.md](https://github.com/dot-skill/skillerr/blob/main/docs/GOOD-FIRST-ISSUES.md).
 
@@ -252,7 +252,7 @@ Full package layout spec: [docs/PROTOCOL.md](https://github.com/dot-skill/skille
 ## Status
 
 Specification: **1.0.0 (Stable)** ([docs/PROTOCOL.md](https://github.com/dot-skill/skillerr/blob/main/docs/PROTOCOL.md)) — future changes go through the open [RFC process](https://github.com/dot-skill/skillerr/blob/main/docs/rfcs/), not silent revisions. Separate axis from the package version directly below, which changes every release.  
-Reference CLI: `skillerr` @ **1.5.2**, a stable public API backed by 200 tests passing on every push (mac/Linux/Windows × Node 22/24), including an [adversarial security corpus](https://github.com/dot-skill/skillerr/wiki/Threat-Model) and a live-tested [transparency-log integration](https://github.com/dot-skill/skillerr/blob/main/docs/TRANSPARENCY.md).  
+Reference CLI: `skillerr` @ **1.6.0**, a stable public API backed by 285 tests passing on every push (mac/Linux/Windows × Node 22/24), including an [adversarial security corpus](https://github.com/dot-skill/skillerr/wiki/Threat-Model) and a live-tested [transparency-log integration](https://github.com/dot-skill/skillerr/blob/main/docs/TRANSPARENCY.md).  
 Independent conforming implementations welcome.
 
 **Why the foundation is future-proof:**
@@ -290,7 +290,7 @@ Host authors typically integrate the protocol libraries; end users install **`sk
 - [What is verifiable](https://github.com/dot-skill/skillerr/blob/main/docs/WHAT-IS-VERIFIABLE.md) · [Trust model](https://github.com/dot-skill/skillerr/blob/main/docs/TRUST-MODEL.md) · [Cryptographic foundation](https://github.com/dot-skill/skillerr/blob/main/docs/CRYPTO-FOUNDATION.md) · [Transparency](https://github.com/dot-skill/skillerr/blob/main/docs/TRANSPARENCY.md) · [Security](https://github.com/dot-skill/skillerr/blob/main/docs/SECURITY.md) · [Threat model](https://github.com/dot-skill/skillerr/wiki/Threat-Model) · [Key ceremony](https://github.com/dot-skill/skillerr/blob/main/docs/KEY-CEREMONY.md) · [Canonicalization (RFC 8785)](https://github.com/dot-skill/skillerr/blob/main/docs/CANONICALIZATION.md)
 - [Mint](https://github.com/dot-skill/skillerr/blob/main/docs/MINT.md) · [Runtime](https://github.com/dot-skill/skillerr/blob/main/docs/RUNTIME.md) · [Workspace](https://github.com/dot-skill/skillerr/blob/main/docs/WORKSPACE.md) · [File type / OS registration](https://github.com/dot-skill/skillerr/blob/main/docs/FILE-TYPE.md)
 - [RFCs](https://github.com/dot-skill/skillerr/blob/main/docs/rfcs/) — protocol design proposals, spec-only and implemented
-- Site guides: [skillerr.com](https://www.skillerr.com/docs/)
+- Site guides: [skillerr.com](https://docs.skillerr.com/)
 
 **Agent Skills ecosystem:** [Agent Skills specification](https://agentskills.io/specification) (the authoring format) · [vercel-labs/skills](https://github.com/vercel-labs/skills) (`npx skills add`, distribution) · [skills.sh](https://skills.sh) (directory) · [Claude Code skills docs](https://code.claude.com/docs/en/skills)
 
@@ -307,4 +307,4 @@ Independent runtimes, language ports, adapters, and adversarial fixtures make th
 
 ## License
 
-[MIT](https://github.com/dot-skill/skillerr/blob/main/LICENSE) — Copyright (c) 2026 Bharat Dudeja
+[Apache License 2.0](https://github.com/dot-skill/skillerr/blob/main/LICENSE) — Copyright 2026 Bharat Dudeja

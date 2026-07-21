@@ -1,9 +1,9 @@
 {
   "name": "skillerr-monorepo",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "private": true,
   "description": "Create, sign, verify, and run portable .skill packages for AI agents: content-addressed identity, Ed25519 + Sigstore provenance, and inspect-before-run trust. Bin: skill.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": {
     "name": "Bharat Dudeja",
     "url": "https://github.com/bharatdudeja13-cmd"

@@ -75,10 +75,17 @@ export {
   compileRecipeToSkill,
   approveCompilation,
   assessCompleteness,
-  redactSecrets,
   CompileRefusalError,
 } from "./compile.js";
 export type { CompileOptions, CompileResult } from "./compile.js";
+export { scrub, redactSecrets, rulesDigest, mergeRedactionReports } from "./scrub.js";
+export type {
+  ScrubInput,
+  ScrubUnit,
+  ScrubOptions,
+  ScrubCustomRule,
+  ScrubResult,
+} from "./scrub.js";
 export {
   anchorToRekor,
   verifyRekorAnchor,
@@ -106,3 +113,68 @@ export type {
 } from "./transparency.js";
 export { assessClaims } from "./claims.js";
 export type { VerifiedClaim, SelfReportedClaim, ClaimsAssurance, AssessClaimsOptions } from "./claims.js";
+export {
+  seal,
+  openSealed,
+  sign,
+  verifySignature,
+  RekorAnchor,
+  capabilitiesFromPermission,
+  evaluateReleaseProfile,
+  verify,
+  generateSBOM,
+} from "./trust-spine.js";
+export type {
+  SealInput,
+  SealResult,
+  OpenSealedResult,
+  Signature,
+  SignOpts,
+  Commitment,
+  Anchor,
+  RekorAnchorConfig,
+  CapabilityKind,
+  Capability,
+  GateResult,
+  Evidence,
+  VerifyResult,
+  RevocationRecord,
+  SBOM,
+  SBOMComponent,
+  SBOMHash,
+} from "./trust-spine.js";
+export {
+  buildLeaf,
+  treeHash,
+  buildSignedTreeHead,
+  generateInclusionProof,
+  verifyInclusion,
+  generateConsistencyProof,
+  verifyConsistency,
+} from "./merkle-log.js";
+export type {
+  LogEvent,
+  Leaf,
+  InclusionProof,
+  SignedTreeHead,
+  ConsistencyProof,
+} from "./merkle-log.js";
+export { isContinuity, openContinuity, resumePreview, renderResumeContract } from "./continuity.js";
+export { captureSession } from "./capture.js";
+export type { CaptureOptions, CaptureContext, CaptureResult } from "./capture.js";
+export type {
+  Gap,
+  ContinuitySection,
+  ContinuityJourney,
+  AgentContextSummary,
+  ContinuityOpenResult,
+  ResumeTarget,
+  ResumeContract,
+  WorkingSet,
+  WorkingSetFile,
+  WorkingSetCommit,
+  PlanItem,
+  FilePointer,
+  ToolResult,
+  ContinuitySource,
+} from "./continuity.js";

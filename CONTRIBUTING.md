@@ -12,7 +12,7 @@ Contributions are **welcome**. This protocol only becomes real if independent pe
 | Candidate | Feature-complete; breaking changes need RFC |
 | Preview | Real, shipped, but the interface or scoring may still change without a major version bump |
 
-The protocol is **1.0.0 (Stable)**. Reference packages are currently **1.5.2**. `@skillerr/skill-score` (`skill score`) is **Preview**; everything else in the reference packages is Stable. See [GOVERNANCE.md](./GOVERNANCE.md) for the full definition.
+The protocol is **1.0.0 (Stable)**. Reference packages are currently **1.6.0**. `@skillerr/skill-score` (`skill score`) is **Preview**; everything else in the reference packages is Stable. See [GOVERNANCE.md](./GOVERNANCE.md) for the full definition.
 
 ## DCO (required)
 
@@ -23,7 +23,7 @@ git commit -s -m "feat: …"
 ```
 
 See [DCO.md](./DCO.md). The DCO sign-off records that you may submit the
-change under the MIT License.
+change under the Apache License 2.0.
 
 ## Branch flow
 
@@ -101,11 +101,28 @@ npm run skill -- --help
 
 - [ ] Commits are DCO signed (`Signed-off-by`)
 - [ ] `npm test` passes
-- [ ] Spec/docs updated if behavior changes
+- [ ] Spec/docs updated if behavior changes (see [Docs impact](#docs-impact))
 - [ ] New protocol behavior has a conformance fixture
 - [ ] No secrets in examples
 - [ ] Prefer **additive** changes
 - [ ] If AI-assisted, say so in the PR (you remain responsible for the change)
+
+## Docs impact
+
+If the PR changes user-visible behavior, CLI output, trust semantics, or a
+package API that docs describe, update the matching page(s) in the same PR.
+[`docs/DOC-MAP.md`](./docs/DOC-MAP.md) lists every doc surface and which
+module it covers — use it to find the right page(s), and add a row there
+when you introduce a new top-level doc or RFC.
+
+CI also enforces:
+
+- Hardcoded package-version mentions match `packages/skillerr/package.json`
+  (`scripts/check-doc-versions.mjs`)
+- Project license claims stay Apache-2.0
+  (`scripts/check-license-consistency.mjs`)
+- Relative markdown links resolve (`scripts/check-doc-links.mjs`)
+- `packages/skillerr/README.md` stays in sync with the root README
 
 ## Spec changes (RFCs)
 
@@ -116,6 +133,6 @@ npm run skill -- --help
 
 ## License
 
-- Code: [MIT](./LICENSE), [docs/LICENSING.md](./docs/LICENSING.md)
+- Code: [Apache-2.0](./LICENSE), [docs/LICENSING.md](./docs/LICENSING.md)
 - Conduct: [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
 - Security: [SECURITY.md](./SECURITY.md)

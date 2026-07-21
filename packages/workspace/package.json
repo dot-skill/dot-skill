@@ -1,8 +1,8 @@
 {
   "name": "@skillerr/workspace",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "Local workspace for sections, stage, compile, checkpoint, and mint",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": {
     "name": "Bharat Dudeja",
     "url": "https://github.com/bharatdudeja13-cmd"
@@ -51,8 +51,8 @@
     "test": "node --test dist/workspace.test.js"
   },
   "dependencies": {
-    "@skillerr/core": "^1.5.2",
-    "@skillerr/protocol": "^1.5.2"
+    "@skillerr/core": "^1.6.0",
+    "@skillerr/protocol": "^1.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

@@ -62,6 +62,14 @@ import {
   verifyKeylessAnchor,
   assessClaims,
   validateContractSchema,
+  scrub,
+  type ScrubCustomRule,
+  captureSession,
+  openContinuity,
+  resumePreview,
+  renderResumeContract,
+  seal,
+  type CaptureContext,
 } from "@skillerr/core";
 import type { AnchorVerification, KeylessVerification, AnchorSubject } from "@skillerr/core";
 import type { GradeOverride } from "@skillerr/core";
@@ -99,6 +107,8 @@ import {
   setJourney,
   requireAgentHost,
   WORKSPACE_DIR,
+  listSections,
+  loadConfig,
 } from "@skillerr/workspace";
 
 function loadPackageVersion(): string {
@@ -147,6 +157,28 @@ Create:
   skill add [id...]                    Stage (default: ALL)
   skill unstage [id...] | skill review | skill discard <id>
   skill checkpoint [-m msg]            Continuity handoff (partial OK)
+  skill capture [-o file.skill] [-m msg] [--context file.json|-]
+                                       Capture the current session into a
+                                       sealed continuity .skill: git working
+                                       set (branch, base/HEAD, redacted diff,
+                                       changed files, recent commits, untracked)
+                                       plus, if given, agent context (intent,
+                                       plan, decisions, rejected paths, open
+                                       threads, knowledge, tool results) from a
+                                       JSON file, "-" for stdin, or an
+                                       auto-loaded .skillerr/context.json.
+                                       Environment capture always runs, so a
+                                       dirty repo is never empty; secrets are
+                                       scrubbed from the diff while the code
+                                       changes and file list are kept. Not
+                                       minted, not anchored. See docs/CONTINUITY.md.
+  skill resume <file.skill> [--json]   Print a paste-ready resume briefing
+                                       (Resume Contract 1.0) from a continuity
+                                       .skill: intent, working-set summary,
+                                       changed files, plan, next steps,
+                                       decisions, open threads, knowledge. Refuses
+                                       a release/catalog package. --json emits the
+                                       structured contract instead of the briefing.
   skill compile -m "msg" [--approve] [--mint] [--profile release|continuity]
                                        Release refuses if incomplete
   skill load <file.skill> [--into dir] [--host name] [--force]
@@ -303,6 +335,32 @@ Ingest / run:
                                        anchor is not re-verified here, see
                                        skill verify-trust --claims for that.
   skill validate <file.skill>          Structure + hash integrity
+  skill scrub <path|-> [--secrets-from f...] [--custom rules.json]
+              [--mode auto|report-only] [--report out.json]
+              [--entropy n] [--strict]
+                                       Deterministic, non-AI secret scrubber
+                                       (docs/SCRUBBING.md). <path> may be a
+                                       file, "-" for stdin, or a workspace
+                                       directory (scrubs staged sections +
+                                       journey as one report, read-only:
+                                       never rewrites workspace files).
+                                       Prints a reproducible RedactionReport
+                                       (same rules_digest + input always
+                                       yields the same output). Known-format
+                                       vendor keys are auto-redacted; only
+                                       high-entropy strings are flagged
+                                       needs_review, never auto-removed.
+                                       --secrets-from opts into exact-match
+                                       redaction against real secret values
+                                       loaded from those files (.env, AWS/SSH
+                                       credentials, etc.) — only the matched
+                                       KEY NAME is ever reported, never the
+                                       value. --mode report-only finds
+                                       without rewriting. --strict exits 2 if
+                                       any needs_review finding remains.
+                                       compile/checkpoint/pack already run
+                                       this automatically and seal the result
+                                       to provenance/redaction.json.
   skill unpack <file.skill>
   skill verify-trust <file.skill> [--profile minted] [--allow-development-issuer]
                      [--allow-self-reported] [--trust-store <path>] [--online]
@@ -358,6 +416,21 @@ function flag(args: string[], name: string): boolean {
 function opt(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
+}
+
+/** Collects every occurrence of a repeatable flag, e.g. --secrets-from a --secrets-from b. */
+function optAll(args: string[], name: string): string[] {
+  const values: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === name && i + 1 < args.length) values.push(args[i + 1]!);
+  }
+  return values;
+}
+
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 /** True when a real agent runtime is attested (session id or runtime markers), not just SKILL_HOST. */
@@ -1173,6 +1246,155 @@ async function main() {
       } else {
         console.log(JSON.stringify(inspectSkill(bytes), null, 2));
       }
+      break;
+    }
+    case "scrub": {
+      const target = rest[0];
+      if (!target) usage();
+      const mode = (opt(rest, "--mode") as "auto" | "report-only" | undefined) ?? "auto";
+      const secretsFromArg = optAll(rest, "--secrets-from").map((p) => resolve(p));
+      const entropyArg = opt(rest, "--entropy");
+      const reportOut = opt(rest, "--report");
+      const strict = flag(rest, "--strict");
+
+      let customRules: ScrubCustomRule[] | undefined;
+      const customPath = opt(rest, "--custom");
+      try {
+        if (customPath) {
+          const raw = JSON.parse(await readFile(resolve(customPath), "utf8")) as
+            | ScrubCustomRule[]
+            | { rules: ScrubCustomRule[] };
+          customRules = Array.isArray(raw) ? raw : raw.rules;
+        }
+      } catch (e) {
+        console.log(
+          JSON.stringify(
+            { ok: false, error: `Failed to read/parse --custom rules file: ${e instanceof Error ? e.message : String(e)}` },
+            null,
+            2,
+          ),
+        );
+        process.exit(2);
+      }
+
+      const scrubOpts = {
+        secretsFrom: secretsFromArg.length ? secretsFromArg : undefined,
+        customRules,
+        mode,
+        entropyThreshold: entropyArg ? Number(entropyArg) : undefined,
+      };
+
+      // <path> may be a workspace directory (its own .skill/ working tree) —
+      // scrub every staged section + the journey summary as one document, so
+      // "same value -> same token" holds document-wide, matching how
+      // compile/checkpoint scrub it (see docs/SCRUBBING.md). Never rewrites
+      // workspace files in place either way: staged content only changes via
+      // the normal compile/checkpoint path, which already seals its own
+      // provenance/redaction.json.
+      const workspaceRoot = existsSync(target) && statSync(target).isDirectory()
+        ? findWorkspaceRoot(resolve(target))
+        : undefined;
+      let result: ReturnType<typeof scrub>;
+      if (workspaceRoot) {
+        const sections = await listSections(workspaceRoot);
+        const config = await loadConfig(workspaceRoot);
+        const units = [
+          ...sections.map((s) => ({ id: s.id, text: s.body })),
+          ...(config.journey_summary ? [{ id: "journey_summary", text: config.journey_summary }] : []),
+          ...(config.open_questions ?? []).map((q, i) => ({ id: `open_question_${i}`, text: q })),
+        ];
+        result = scrub(units, { ...scrubOpts, mode: "report-only" });
+      } else {
+        let text: string;
+        try {
+          text = target === "-" ? await readStdin() : await readFile(resolve(target), "utf8");
+        } catch (e) {
+          console.log(
+            JSON.stringify(
+              { ok: false, error: `Failed to read ${target}: ${e instanceof Error ? e.message : String(e)}` },
+              null,
+              2,
+            ),
+          );
+          process.exit(2);
+        }
+        result = scrub(text, scrubOpts);
+      }
+
+      if (reportOut) {
+        await writeFile(resolve(reportOut), JSON.stringify(result.report, null, 2) + "\n", "utf8");
+      }
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            report: result.report,
+            scrubbed: mode === "report-only" ? undefined : result.scrubbed,
+          },
+          null,
+          2,
+        ),
+      );
+      process.exit(strict && result.report.summary.needs_review > 0 ? 2 : 0);
+      break;
+    }
+    case "capture": {
+      // Captures the current session (git working set + optional agent
+      // context) into a sealed continuity .skill. Environment capture always
+      // runs; a dirty repo is never empty. See docs/CONTINUITY.md.
+      const out = opt(rest, "-o") ?? opt(rest, "--out");
+      const message = opt(rest, "-m") ?? opt(rest, "--message");
+      const context: CaptureContext | string | undefined = opt(rest, "--context");
+      const result = await captureSession({
+        cwd: process.cwd(),
+        intent: message,
+        context,
+      });
+      const sealed = await seal(result.pkg);
+      if (out) await writeFile(resolve(out), sealed.zip);
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            digest: sealed.digest,
+            has_git: result.hasGit,
+            working_set: result.workingSet
+              ? {
+                  branch: result.workingSet.branch,
+                  dirty: result.workingSet.dirty,
+                  changed_files: result.workingSet.files.length,
+                  untracked: result.workingSet.untracked.length,
+                  commits: result.workingSet.commits.length,
+                  diff_bytes: result.workingSet.diff?.length ?? 0,
+                }
+              : null,
+            journey_summary: result.journey.summary,
+            redaction: result.redaction.summary,
+            written: out ? resolve(out) : undefined,
+            note: out
+              ? undefined
+              : "No -o <file> given, nothing written. Re-run with -o handoff.skill to save the sealed continuity package.",
+          },
+          null,
+          2,
+        ),
+      );
+      process.exit(0);
+      break;
+    }
+    case "resume": {
+      // Reads a sealed continuity .skill and prints a paste-ready resume
+      // briefing (Resume Contract 1.0). No preview/pending framing.
+      const file = rest.find((a) => !a.startsWith("-"));
+      if (!file) usage();
+      const opened = await openContinuity(new Uint8Array(await readFile(resolve(file))));
+      const contract = resumePreview(opened);
+      if (flag(rest, "--json")) {
+        console.log(JSON.stringify({ ok: true, contract }, null, 2));
+      } else {
+        console.log(renderResumeContract(contract));
+      }
+      process.exit(0);
       break;
     }
     case "validate": {
