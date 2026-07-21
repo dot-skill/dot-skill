@@ -8,7 +8,7 @@ Newest first.
 
 The hollow `capture → resume` (empty payload, "_preview (Resume Contract pending)_" header) is fixed at the source. `@skillerr/core` now ships the **real** capture + resume surface — replace the mocks in `src/lib/core-adapter.ts` with the real imports.
 
-**Now real in `@skillerr/core`** (on `develop`; see the version note below):
+**Now real in `@skillerr/core@1.6.0`:**
 - `captureSession(opts): Promise<CaptureResult>` — the missing piece. Always runs git working-set capture from `opts.cwd` (branch, base/HEAD, staged+unstaged diff, changed files with `+adds -dels`, recent commits, untracked), so a dirty repo is **never** empty. Merges optional agent context over it. Returns `{ pkg (sealable continuity SkillPackageFiles), workingSet, journey, source, redaction, hasGit }`.
 - `openContinuity`, `isContinuity`, `resumePreview` — real, over the actual payload (not stubs). `resumePreview` now returns the full Resume Contract 1.0 (workingSet, plan, nextSteps, decisions, rejectedPaths, openThreads, gaps, knowledge, filePointers, toolResults, resumeTargets).
 - `renderResumeContract(contract): string` — paste-ready markdown briefing. **No "preview"/"pending" framing** — remove any client-side placeholder text; when fields are populated the renderer emits them.
@@ -38,9 +38,9 @@ Redaction (core's `scrub()`) removes secrets from the diff/strings but keeps the
 
 This is also exposed in the reference CLI as `skill capture` / `skill resume` if useful as a reference implementation to diff against.
 
-## Pending release — on `develop`, not yet published
+## Shipped in 1.6.0
 
-Everything below is merged into this repo's `develop` branch but **has not gone through a release yet** (no `release/*` branch cut, no version bump, no npm publish) — `@skillerr/core@1.5.2` on npm today still predates all of it. Pin against a specific commit on `develop` if you need to integrate before a real version ships; this note will be updated with the actual version number once one does.
+The items below shipped in `@skillerr/core@1.6.0` (and lockstep sibling packages). Pin `^1.6.0` (or exact `1.6.0`) and drop the mocks.
 
 **Adapter layer** (`packages/core/src/trust-spine.ts`), matching spec/CONTRACT.md's Section 3a shapes:
 - `seal`, `openSealed`
