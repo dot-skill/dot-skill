@@ -101,11 +101,28 @@ npm run skill -- --help
 
 - [ ] Commits are DCO signed (`Signed-off-by`)
 - [ ] `npm test` passes
-- [ ] Spec/docs updated if behavior changes
+- [ ] Spec/docs updated if behavior changes (see [Docs impact](#docs-impact))
 - [ ] New protocol behavior has a conformance fixture
 - [ ] No secrets in examples
 - [ ] Prefer **additive** changes
 - [ ] If AI-assisted, say so in the PR (you remain responsible for the change)
+
+## Docs impact
+
+If the PR changes user-visible behavior, CLI output, trust semantics, or a
+package API that docs describe, update the matching page(s) in the same PR.
+[`docs/DOC-MAP.md`](./docs/DOC-MAP.md) lists every doc surface and which
+module it covers — use it to find the right page(s), and add a row there
+when you introduce a new top-level doc or RFC.
+
+CI also enforces:
+
+- Hardcoded package-version mentions match `packages/skillerr/package.json`
+  (`scripts/check-doc-versions.mjs`)
+- Project license claims stay Apache-2.0
+  (`scripts/check-license-consistency.mjs`)
+- Relative markdown links resolve (`scripts/check-doc-links.mjs`)
+- `packages/skillerr/README.md` stays in sync with the root README
 
 ## Spec changes (RFCs)
 
