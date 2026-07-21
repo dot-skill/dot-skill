@@ -64,6 +64,12 @@ import {
   validateContractSchema,
   scrub,
   type ScrubCustomRule,
+  captureSession,
+  openContinuity,
+  resumePreview,
+  renderResumeContract,
+  seal,
+  type CaptureContext,
 } from "@skillerr/core";
 import type { AnchorVerification, KeylessVerification, AnchorSubject } from "@skillerr/core";
 import type { GradeOverride } from "@skillerr/core";
@@ -151,6 +157,28 @@ Create:
   skill add [id...]                    Stage (default: ALL)
   skill unstage [id...] | skill review | skill discard <id>
   skill checkpoint [-m msg]            Continuity handoff (partial OK)
+  skill capture [-o file.skill] [-m msg] [--context file.json|-]
+                                       Capture the current session into a
+                                       sealed continuity .skill: git working
+                                       set (branch, base/HEAD, redacted diff,
+                                       changed files, recent commits, untracked)
+                                       plus, if given, agent context (intent,
+                                       plan, decisions, rejected paths, open
+                                       threads, knowledge, tool results) from a
+                                       JSON file, "-" for stdin, or an
+                                       auto-loaded .skillerr/context.json.
+                                       Environment capture always runs, so a
+                                       dirty repo is never empty; secrets are
+                                       scrubbed from the diff while the code
+                                       changes and file list are kept. Not
+                                       minted, not anchored. See docs/CONTINUITY.md.
+  skill resume <file.skill> [--json]   Print a paste-ready resume briefing
+                                       (Resume Contract 1.0) from a continuity
+                                       .skill: intent, working-set summary,
+                                       changed files, plan, next steps,
+                                       decisions, open threads, knowledge. Refuses
+                                       a release/catalog package. --json emits the
+                                       structured contract instead of the briefing.
   skill compile -m "msg" [--approve] [--mint] [--profile release|continuity]
                                        Release refuses if incomplete
   skill load <file.skill> [--into dir] [--host name] [--force]
@@ -1308,6 +1336,65 @@ async function main() {
         ),
       );
       process.exit(strict && result.report.summary.needs_review > 0 ? 2 : 0);
+      break;
+    }
+    case "capture": {
+      // Captures the current session (git working set + optional agent
+      // context) into a sealed continuity .skill. Environment capture always
+      // runs; a dirty repo is never empty. See docs/CONTINUITY.md.
+      const out = opt(rest, "-o") ?? opt(rest, "--out");
+      const message = opt(rest, "-m") ?? opt(rest, "--message");
+      const context: CaptureContext | string | undefined = opt(rest, "--context");
+      const result = await captureSession({
+        cwd: process.cwd(),
+        intent: message,
+        context,
+      });
+      const sealed = await seal(result.pkg);
+      if (out) await writeFile(resolve(out), sealed.zip);
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            digest: sealed.digest,
+            has_git: result.hasGit,
+            working_set: result.workingSet
+              ? {
+                  branch: result.workingSet.branch,
+                  dirty: result.workingSet.dirty,
+                  changed_files: result.workingSet.files.length,
+                  untracked: result.workingSet.untracked.length,
+                  commits: result.workingSet.commits.length,
+                  diff_bytes: result.workingSet.diff?.length ?? 0,
+                }
+              : null,
+            journey_summary: result.journey.summary,
+            redaction: result.redaction.summary,
+            written: out ? resolve(out) : undefined,
+            note: out
+              ? undefined
+              : "No -o <file> given, nothing written. Re-run with -o handoff.skill to save the sealed continuity package.",
+          },
+          null,
+          2,
+        ),
+      );
+      process.exit(0);
+      break;
+    }
+    case "resume": {
+      // Reads a sealed continuity .skill and prints a paste-ready resume
+      // briefing (Resume Contract 1.0). No preview/pending framing.
+      const file = rest.find((a) => !a.startsWith("-"));
+      if (!file) usage();
+      const opened = await openContinuity(new Uint8Array(await readFile(resolve(file))));
+      const contract = resumePreview(opened);
+      if (flag(rest, "--json")) {
+        console.log(JSON.stringify({ ok: true, contract }, null, 2));
+      } else {
+        console.log(renderResumeContract(contract));
+      }
+      process.exit(0);
       break;
     }
     case "validate": {

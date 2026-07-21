@@ -1,71 +1,126 @@
-# RFC 0009 — Resume Contract 1.0 (continuity surface)
+# RFC 0009 — Resume Contract 1.0 (continuity capture + resume)
 
-Status: **Implemented** — `packages/core/src/continuity.ts` (`isContinuity`, `openContinuity`, `resumePreview`), tests in `continuity.test.ts`. See [spec/CONTRACT.md](../../spec/CONTRACT.md)'s status table.
+Status: **Implemented** — capture in `packages/core/src/capture.ts` (`captureSession`); read/resume in `packages/core/src/continuity.ts` (`isContinuity`, `openContinuity`, `resumePreview`, `renderResumeContract`). Tests in `capture.test.ts` + `continuity.test.ts`. See [spec/CONTRACT.md](../../spec/CONTRACT.md)'s status table.
 
 ## Motivation
 
-Continuity `.skill` packages (`compile_profile: "continuity"`) already carry everything a receiving agent needs to pick up a session where it left off: a redacted journey (`provenance.journey`), staged knowledge, and agent context — but nothing in `@skillerr/core` exposed that in one stable, host-agnostic shape. Every product that wanted a "resume this session" feature (the private `skillerr-registry` product's Sessions/Handoffs surface being the concrete driver) had to reach into a package's internals itself, re-deciding what counts as a continuity package versus a release, and re-inventing its own notion of "what a receiving agent needs to reconstruct" independently. That's exactly the kind of reusable, protocol-native primitive `@skillerr/core` exists to own once, not something every downstream product should reimplement — see the [core/registry frozen contract](../../spec/CONTRACT.md)'s framing.
+Continuity `.skill` packages (`compile_profile: "continuity"`) are meant to let a receiving agent pick up a session where another left off. Two gaps made this hollow in practice:
+
+1. **Nothing captured the actual work state.** A capture recorded a one-line journey and little else — no diff, no changed files, no branch, no plan — so a downstream "resume" surface (the private `skillerr-registry` product's Sessions/Handoffs lane being the concrete driver) materialized an empty briefing. Observed on prod: `capture → resume` produced six files whose payload was a single line ("Checkpoint captured: CLI capture (redacted metadata)"), no gaps, no knowledge, no working set, and a header reading *preview (Resume Contract pending)*. The root cause was that the real capture and render functions were never shipped in `@skillerr/core`; the client ran on mocks.
+
+2. **No stable shape for "what a receiving agent must reconstruct."** Every product reinvented it. That's exactly the reusable, protocol-native primitive `@skillerr/core` should own once — see the [core/registry frozen contract](../../spec/CONTRACT.md).
+
+This RFC ships both: a real **capture** (write) side that reads git + the working tree and never comes back empty in a dirty repo, and a stable **Resume Contract 1.0** (read side) plus a renderer that emits a substantive briefing.
 
 ## Proposal
 
-Three functions, `packages/core/src/continuity.ts`:
+### Capture (write side) — `captureSession`
 
-- **`isContinuity(pkg: { manifest: SkillManifest } | SkillManifest): boolean`** — `manifest.compile_profile === "continuity"`. Sufficient on its own: `mintSkillPackage` (`mint.ts`) requires `compile_profile === "release"` to mint at all, so `"continuity"` and "minted" are already mutually exclusive by construction — no separate mint-status check needed, and no continuity package can ever pass as a minted release.
+`captureSession(opts): Promise<CaptureResult>` (`capture.ts`) has two intake paths, and **environment capture always runs**:
 
-- **`openContinuity(zip): Promise<ContinuityOpenResult>`** — unpacks the archive (`unpackSkill`), refuses (throws) anything that isn't `isContinuity`, and reshapes the real, already-typed continuity data into a stable contract shape:
+1. **Environment capture (automatic, zero cooperation).** Reads git in `opts.cwd` (default `process.cwd()`) and builds a `WorkingSet`: current branch, base (merge-base with upstream / `origin/HEAD` / `main` / `master`) and HEAD short SHAs, the staged+unstaged unified diff vs HEAD (`git diff HEAD`, size-capped and flagged when truncated), the changed-file list with per-file status and `+adds -dels` counts (`git status --porcelain` joined with `git diff --numstat HEAD`), recent commits (`git log`, subjects redacted), and untracked files. In a dirty repo this path alone yields a substantive payload. Outside a git repo, `hasGit` is `false` and the payload says so honestly rather than fabricating one.
 
-  ```ts
-  interface ContinuityOpenResult {
-    manifest: SkillManifest;
-    digest: string;           // sha256:..., manifest.package_digest
-    profile: "continuity";
-    agentContext: Partial<Pick<AgentContext, "host" | "provider" | "model" | "deployment">>;
-    intent?: string;
-    journey: { summary: string; open_questions: string[]; decisions: string[] };
-    gaps: Gap[];               // journey.open_questions + journey.decisions, tagged and severity-scored
-    knowledge: KnowledgeItem[];
-    sections: ContinuitySection[]; // knowledge reshaped to {id, title, body}
-  }
-  ```
+2. **Agent-supplied context (richer, optional).** An agent passes structured context as a `CaptureContext` object, a path to a JSON file, `-` for stdin, or (when `opts.context` is omitted) an auto-discovered `.skillerr/context.json` under `cwd`. It's merged **over** the environment capture.
 
-  Built directly from `provenance.journey` (a real, already-typed `JourneyProvenance` — `{summary, open_questions?, decisions?, redacted, sensitivity}`, not `unknown`) and `provenance.source` (typed `unknown` at the protocol level, since it's "scrubbed SkillSource or product source"; `openContinuity` reads `.agent` off it defensively). No new file convention, no new manifest fields — this is a read-only reshape of data continuity packages already carry.
+```ts
+interface CaptureContext {
+  intent?: string;
+  title?: string;
+  agent?: { host?: string; provider?: string; model?: string; deployment?: string };
+  journey?: { summary?: string; open_questions?: string[]; decisions?: string[] };
+  plan?: Array<{ status: "todo" | "in_progress" | "done"; text: string }>;
+  nextSteps?: string[];
+  rejectedPaths?: string[];   // approaches tried and abandoned
+  openThreads?: string[];     // merged into journey.open_questions
+  decisions?: string[];       // merged into journey.decisions
+  knowledge?: Array<{ title: string; body: string; type?: KnowledgeItemType }>;
+  filePointers?: Array<{ path: string; note?: string }>;
+  toolResults?: Array<{ tool: string; summary: string }>;
+}
+```
 
-  `agentContext` fields are optional (`Partial`), not defaulted to a placeholder string: a `provenance_mode: "proof_only"` continuity package genuinely has no recoverable agent context, and representing that honestly (absent) is preferred over fabricating a fallback value, consistent with this repo's "never fabricate provenance" discipline elsewhere (e.g. `skill load`'s own "never fabricates human review").
+**Merge rule**: scalars (`intent`, `title`, `agent`) — agent value wins; `journey.summary` — agent value else the git-derived summary. Array fields the git environment can't derive (`plan`, `nextSteps`, `rejectedPaths`, `knowledge`, `filePointers`, `toolResults`) are agent-only; `openThreads`/`decisions` union into the journey's `open_questions`/`decisions`.
 
-- **`resumePreview(pkg: ContinuityOpenResult): ResumeContract`** — pure, synchronous (everything it needs is already in `pkg`, no further I/O):
+The result is a sealable continuity `SkillPackageFiles` (`compile_profile: "continuity"`, `provenance_mode: "redacted"`, never mint-eligible) plus the structured pieces:
 
-  ```ts
-  interface ResumeContract {
-    version: "1.0";
-    digest: string;
-    intent?: string;
-    agentContext: AgentContextSummary;
-    gaps: Gap[];
-    knowledge: KnowledgeItem[];
-    resumeTargets: Array<{ agent: "cursor" | "claude" | "codex"; label: string; command: string }>;
-  }
-  ```
+```ts
+interface CaptureResult {
+  pkg: SkillPackageFiles;   // ready for seal()/packSkill
+  workingSet?: WorkingSet;
+  journey: ContinuityJourney;
+  source: ContinuitySource;
+  redaction: RedactionReport;
+  hasGit: boolean;
+}
+```
 
-  `resumeTargets` deliberately uses this repo's own, already-real, already-host-agnostic `skill load <path> --into .` (see [docs/CLI-FLOW.md](../CLI-FLOW.md)) as the command for every agent, with `<path>` left as a placeholder for the caller to substitute — never a product-specific install command (e.g. a registry's own `npx <package> <id>` convention). This is a direct consequence of the core/registry independence invariant: `@skillerr/core` has no way to know a registry's URL scheme, and baking one in would be exactly the kind of coupling [spec/CONTRACT.md](../../spec/CONTRACT.md) forbids. A product wanting a branded one-liner composes it on its own side from this contract's `resumeTargets` + its own download URL.
+### The continuity payload — `ContinuitySource`
+
+Written into the existing `provenance.source` slot (typed `unknown` at the protocol level — "scrubbed SkillSource or product source"). **Fully additive**: no new `.skill` container entry, no new `SkillManifest` field, just a documented structure inside `provenance/source.json`:
+
+```ts
+interface ContinuitySource {
+  kind: "continuity_source";
+  agent?: AgentContextSummary;
+  workingSet?: WorkingSet;      // branch, baseSha, headSha, dirty, files[], diff, diffTruncated, commits[], untracked[]
+  plan?: PlanItem[];
+  nextSteps?: string[];
+  rejectedPaths?: string[];
+  filePointers?: FilePointer[];
+  toolResults?: ToolResult[];
+}
+```
+
+### Redaction must not eat the substance
+
+The diff, every commit subject, and every agent-supplied string are run through `@skillerr/core`'s deterministic scrubber (`scrub()`, [docs/SCRUBBING.md](../SCRUBBING.md)) in one batched pass (so "same secret → same placeholder" holds across them). Redaction replaces **secrets only** (keys/tokens/credentials → `{{redacted:…}}`) and never removes the diff, the file list, or the journey. This is enforced by a test: a capture whose diff contains both a real secret and real code changes must, after redaction, still carry the code changes and the file list while the secret is scrubbed, and the secret must not appear anywhere in the sealed package.
+
+### Resume Contract 1.0 (read side) — `resumePreview` + `renderResumeContract`
+
+`openContinuity(zip)` unpacks, refuses anything that isn't `compile_profile: "continuity"`, and reshapes the sealed payload (journey → gaps, knowledge → sections, plus the `ContinuitySource` fields) into a `ContinuityOpenResult`. `resumePreview(opened)` derives the stable contract:
+
+```ts
+interface ResumeContract {
+  version: "1.0";
+  digest: string;
+  intent?: string;
+  agentContext: AgentContextSummary;
+  workingSet?: WorkingSet;
+  plan?: PlanItem[];
+  nextSteps: string[];
+  decisions: string[];       // resolved, carried forward
+  rejectedPaths: string[];   // tried and abandoned
+  openThreads: string[];     // unresolved, for the next agent
+  gaps: Gap[];               // open_questions (warn) + decisions (info), tagged
+  knowledge: KnowledgeItem[];
+  filePointers: FilePointer[];
+  toolResults: ToolResult[];
+  resumeTargets: Array<{ agent: "cursor" | "claude" | "codex"; label: string; command: string }>;
+}
+```
+
+`renderResumeContract(contract)` turns it into a paste-ready markdown briefing: intent, agent context, working-set summary with changed files / untracked / recent commits / a fenced redacted diff, plan, next steps, decisions, tried-and-abandoned, open threads, key files, notable tool results, and knowledge. It emits **no** "preview"/"pending" framing — when a field is populated it renders it, when a section is genuinely empty it is omitted (never shown as a placeholder), so a real capture never renders as a hollow header.
+
+`resumeTargets` deliberately uses this repo's own host-agnostic `skill load <path> --into .` (see [docs/CLI-FLOW.md](../CLI-FLOW.md)) for every agent, `<path>` left as a placeholder — never a product-specific install command. This is the core/registry independence invariant: `@skillerr/core` has no way to know a registry's URL scheme, and a product wanting a branded one-liner composes it from `resumeTargets` + its own download URL.
 
 ### Gap severity
 
-`journey.open_questions` become `kind: "open_question"`, `severity: "warn"` (unresolved, needs a decision). `journey.decisions` become `kind: "decision"`, `severity: "info"` (already resolved, informational context for the resuming agent). No `"block"` severity is emitted by this version — nothing in a continuity package's current shape distinguishes a merely-open question from one that should actually block resuming; that's a real gap, tracked in Open Questions below.
+`journey.open_questions` → `kind: "open_question"`, `severity: "warn"` (unresolved). `journey.decisions` → `kind: "decision"`, `severity: "info"` (resolved context). No `"block"` severity is emitted yet — see Open questions.
 
 ## Schema diff
 
-Purely additive: three new exported functions and their result types in `@skillerr/core`. No change to the `.skill` container format, `SkillManifest`, or `JourneyProvenance` — continuity packages already carried everything this reads.
+Purely additive. New exported functions (`captureSession`, `renderResumeContract`) and types (`CaptureContext`, `CaptureResult`, `CaptureOptions`, `WorkingSet`, `ContinuitySource`, `PlanItem`, `FilePointer`, `ToolResult`, and the expanded `ContinuityOpenResult`/`ResumeContract`) in `@skillerr/core`. No change to the `.skill` container format, `SkillManifest`, or `JourneyProvenance`; the payload lives inside the existing `provenance/source.json`.
 
 ## Migration
 
-Nothing to migrate. Existing continuity packages (already compiled, already packed) work with `openContinuity` unchanged; nothing about how continuity packages are produced changes.
+Nothing to migrate. Existing continuity packages open unchanged (the new `ContinuityOpenResult` fields are just absent when a package predates capture). Packages produced by the old one-line capture still open; they simply carry less.
 
 ## Fixtures
 
-Covered by `packages/core/src/continuity.test.ts`: a hand-built real continuity `SkillPackageFiles` (real `packSkill`/`unpackSkill` round trip, not a mock) exercising `isContinuity`'s true/false cases, `openContinuity`'s reshape of journey into gaps with correct severities, its refusal of a release-profile package, its honest handling of missing/absent provenance (`proof_only`-style), and `resumePreview`'s derivation — including an explicit assertion that no resume target ever contains a registry hostname or product-specific install command.
+`capture.test.ts` builds a **real throwaway git repo** (staged + unstaged changes, two commits, an untracked file) and runs the real `captureSession` — no mocked working set — asserting the diff, files, branch, and commits are populated and non-trivial; that a clean repo is honestly clean; that outside git it says so; that agent context merges over the environment capture carrying both; that `.skillerr/context.json` is auto-loaded; the redaction-preserves-substance case (Section above); and the full `capture → seal → openContinuity → renderResumeContract` round trip, asserting the briefing contains the working-set summary, file refs, and next steps, and contains **no** preview/pending framing. `continuity.test.ts` covers the read side against a hand-built real package.
 
 ## Open questions
 
-- **Gap severity beyond warn/info**: should some open questions be promotable to `"block"` (e.g. an explicitly-flagged blocking decision)? Nothing in `JourneyProvenance` currently distinguishes this; would need either a new optional field there or a heuristic, neither designed yet.
-- **Cross-tool session adapters** (per-tool capture for Claude Code, Codex, Gemini CLI, OpenCode, Copilot, per [docs/ROADMAP.md](../ROADMAP.md)'s Phase 4 continuity item) are a separate, larger effort this RFC deliberately doesn't take on — `resumePreview`'s `resumeTargets` describes the same generic `skill load` command for every agent today because that's genuinely all that exists; richer per-agent resume commands are a natural follow-up once/if per-tool adapters exist.
-- **Full-fidelity continuity capture** (real journey/section content beyond summaries, per ROADMAP's Phase 3) would enrich `ContinuityOpenResult.sections`/`.knowledge` but isn't required for this contract's shape to be useful today.
+- **Gap severity beyond warn/info**: promoting some open questions to `"block"` would need a new optional field on the payload or a heuristic; not designed yet.
+- **Richer per-agent resume commands**: `resumeTargets` is the same generic `skill load` for every agent because that's genuinely all that exists today; per-tool session adapters (ROADMAP Phase 4: Claude Code, Codex, Gemini CLI, OpenCode, Copilot) are a separate, larger effort.
+- **Journey timeline fidelity**: an agent-run capture can supply a richer action/decision/tool-result timeline than the git-derived work-state timeline; this RFC specifies the intake for it (`CaptureContext.journey`, `toolResults`) but doesn't mandate a particular timeline granularity.

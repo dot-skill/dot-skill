@@ -4,6 +4,40 @@ This is the only handshake between this repo and the private `skillerr-registry`
 
 Newest first.
 
+## ACTION REQUIRED — real session capture shipped, drop the mocks
+
+The hollow `capture → resume` (empty payload, "_preview (Resume Contract pending)_" header) is fixed at the source. `@skillerr/core` now ships the **real** capture + resume surface — replace the mocks in `src/lib/core-adapter.ts` with the real imports.
+
+**Now real in `@skillerr/core`** (on `develop`; see the version note below):
+- `captureSession(opts): Promise<CaptureResult>` — the missing piece. Always runs git working-set capture from `opts.cwd` (branch, base/HEAD, staged+unstaged diff, changed files with `+adds -dels`, recent commits, untracked), so a dirty repo is **never** empty. Merges optional agent context over it. Returns `{ pkg (sealable continuity SkillPackageFiles), workingSet, journey, source, redaction, hasGit }`.
+- `openContinuity`, `isContinuity`, `resumePreview` — real, over the actual payload (not stubs). `resumePreview` now returns the full Resume Contract 1.0 (workingSet, plan, nextSteps, decisions, rejectedPaths, openThreads, gaps, knowledge, filePointers, toolResults, resumeTargets).
+- `renderResumeContract(contract): string` — paste-ready markdown briefing. **No "preview"/"pending" framing** — remove any client-side placeholder text; when fields are populated the renderer emits them.
+
+**What `@skillerr/add` must do to fix the hollow capture** (the payload was empty because the client sent metadata only):
+1. Either let core do the environment capture (call `captureSession({ cwd })` — it reads git itself), **or** if the client captures git itself, upload the full payload — the diff, file list, branch, base/HEAD, commits, untracked — not a one-line summary.
+2. Accept richer agent context and pass it through as a `CaptureContext` (object, `--context <file.json>`, `-` for stdin, or an auto-loaded `.skillerr/context.json`). Intake schema (all fields optional, every string is scrubbed by core):
+   ```ts
+   interface CaptureContext {
+     intent?: string; title?: string;
+     agent?: { host?: string; provider?: string; model?: string; deployment?: string };
+     journey?: { summary?: string; open_questions?: string[]; decisions?: string[] };
+     plan?: Array<{ status: "todo" | "in_progress" | "done"; text: string }>;
+     nextSteps?: string[]; rejectedPaths?: string[];
+     openThreads?: string[];  // -> journey.open_questions
+     decisions?: string[];    // -> journey.decisions
+     knowledge?: Array<{ title: string; body: string; type?: string }>;
+     filePointers?: Array<{ path: string; note?: string }>;
+     toolResults?: Array<{ tool: string; summary: string }>;
+   }
+   ```
+3. Upload **all** payload fields (don't truncate to metadata). Render/upload the Resume Contract 1.0 faithfully; drop the "Resume Contract pending" label.
+
+Redaction (core's `scrub()`) removes secrets from the diff/strings but keeps the diff, file list, and journey — over-redaction is not the cause of an empty payload; a metadata-only upload was. Full shapes: [`spec/CONTRACT.md`](./spec/CONTRACT.md) §3a + [RFC 0009](./docs/rfcs/0009-resume-contract.md).
+
+**Client-side, for Cursor to act on (not a core issue):** the npx cache was observed serving a stale `@skillerr/add@0.2.0`. Surface/pin the client version (print it, or `npx @skillerr/add@latest`) so users aren't silently on an old build with the mock capture.
+
+This is also exposed in the reference CLI as `skill capture` / `skill resume` if useful as a reference implementation to diff against.
+
 ## Pending release — on `develop`, not yet published
 
 Everything below is merged into this repo's `develop` branch but **has not gone through a release yet** (no `release/*` branch cut, no version bump, no npm publish) — `@skillerr/core@1.5.2` on npm today still predates all of it. Pin against a specific commit on `develop` if you need to integrate before a real version ships; this note will be updated with the actual version number once one does.
@@ -19,7 +53,7 @@ Everything below is merged into this repo's `develop` branch but **has not gone 
 
 **Merkle-log spine** (`packages/core/src/merkle-log.ts`): `buildLeaf`, `verifyInclusion`, `verifyConsistency`, plus the constructive counterparts a log host needs (`treeHash`, `generateInclusionProof`, `generateConsistencyProof`, `buildSignedTreeHead`) — a from-scratch RFC 6962-style Merkle tree, pure/standalone, no registry knowledge. Nothing existed for this before; treat it as the trust primitive most worth independent review given its role.
 
-**Continuity surface** (`packages/core/src/continuity.ts`, [RFC 0009](./docs/rfcs/0009-resume-contract.md)): `isContinuity`, `openContinuity`, `resumePreview` — Resume Contract 1.0. Built directly on real `provenance.journey`/`knowledge`, not any invented file convention (differs in shape from what `registry/continuity-surface`'s mock in `src/lib/core-adapter.ts` guessed — no "steps" array, no `continuity.json` file). `resumeTargets` deliberately uses this repo's own host-agnostic `skill load <path>`, never a product-specific install command.
+**Continuity surface** (`packages/core/src/capture.ts` + `continuity.ts`, [RFC 0009](./docs/rfcs/0009-resume-contract.md)): `captureSession` (the write side, git working-set capture + agent-context intake), `isContinuity`, `openContinuity`, `resumePreview`, `renderResumeContract` — Resume Contract 1.0. Built directly on real `provenance.journey`/`knowledge` and a `ContinuitySource` payload inside the existing `provenance/source.json`, not any invented file convention (differs from what `registry/continuity-surface`'s mock in `src/lib/core-adapter.ts` guessed — no "steps" array, no `continuity.json` file). `resumeTargets` deliberately uses this repo's own host-agnostic `skill load <path>`, never a product-specific install command. See the ACTION REQUIRED note above.
 
 Relicensed to **Apache-2.0** (was MIT) — sole-author decision, see spec/CONTRACT.md's licensing note.
 
